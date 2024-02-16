@@ -33,6 +33,9 @@ namespace LGTracer
                 OpenMode = ResourceOpenMode.Create
             };
 
+            // Number of Lagrangian points to track
+            int nPoints = 5000;
+
             // Set up the mesh (units of meters)
             double xMin = -200.0;
             double xMax =  200.0;
@@ -99,18 +102,17 @@ namespace LGTracer
             double dtStorage = 1.0; // Storage period (seconds)
             double tStorage = 0.0; // Next time that we want storage to occur
 
-            // Number of Lagrangian points to track
-            int nPoints = 100;
-
             // This should all be put into a class for a single point and held in a list of points
             List<LGPoint> points = [];
 
             // Get random values between zero and 1
             System.Random rng = SystemRandomSource.Default;
             (double[] xInitial, double[] yInitial) = MapRandomToXY(xMin,xMax,yMin,yMax,rng,nPoints);
+            uint index = 0;
             for (int i=0;i<nPoints;i++)
             {
-                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega)));
+                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega),index));
+                index += 1;
             }
         
             // Set up output
@@ -130,14 +132,18 @@ namespace LGTracer
             bool loopOK = true;
             double xCurr, yCurr;
             double rErrPcg, thetaErrDeg, radius, thetaDeg;
-            int iPoint;
+            int iPoint, nInactive, nNew, nAvailable;
+
+            nNew = 50; // Number of new points to add at each time step
             
             Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
             for (int iter=0;iter<iterMax; iter++)
             {
-                //for (int i=0;i<nPoints;i++)
+                // Counter of active points
                 iPoint = 0; // Counter, why not
-                foreach (LGPoint point in points)
+
+                // Audit points: what has left the domain?
+                foreach (LGPoint point in points.Where(point => point.Active))
                 {
                     // Get the current location of the point and check that it's within bounds
                     xCurr = point.X;
@@ -145,25 +151,61 @@ namespace LGTracer
 
                     if ((xCurr < xMin) || (xCurr >= xMax) || (yCurr < yMin) || (yCurr >= yMax))
                     {
-                        loopOK = false;
-                        break;
+                        // Retire the point and move on
+                        point.Deactivate();
                     }
 
-                    // If so desired - evaluate current error value
-                    if (iPoint == 0 && (iter%10) == 0)
-                    {
-                        (radius, rErrPcg, thetaDeg, thetaErrDeg) = RThetaError(point.InitialLocation[0],point.InitialLocation[1],omega,tCurr,point.X,point.Y);
-                        Console.WriteLine($" Time {tCurr,5:f1} --> Point {iPoint,3:d} at X {point.X,6:f1}/ Y {point.Y,6:f1}/ R {radius,6:f1}/ THETA {thetaDeg,6:f1}/ R ERR {rErrPcg,6:f2}%/ THETA ERR {thetaErrDeg,8:f4}");
-                    }
-
-                    point.Advance(dt);
                     iPoint += 1;
                 }
-                if (!loopOK)
+                //Console.WriteLine($"{iPoint,5:d} points of {nPoints,5:d} active");
+                nInactive = nPoints - iPoint;
+
+                // We want to introduce nNew at the edge, but we can only go up to nInactive
+                nAvailable = Math.Min(nInactive,nNew);
+                iPoint = 0;
+
+                // If we have enough points available, scatter them evenly over the edges of the domain
+                // TODO: Make this only at locations where we have inbound flow?
+                foreach (LGPoint point in points.Where(point => !point.Active))
                 {
-                    Console.WriteLine($"Stopped early at time {tCurr} due to out-of-domain point");
-                    break;
+                    // Stop if we are out of available points
+                    if (iPoint >= nAvailable)
+                    {
+                        break;
+                    }
+                    // Activate the point at a location randomly chosen from the domain edge
+                    // Algorithm below basically goes around the edges of the domain in order
+                    xCurr = rng.NextDouble() * (xRange*2) + (yRange*2);
+                    if (xCurr < xRange)
+                    {
+                        yCurr = yMin;
+                        xCurr += xMin;
+                    }
+                    else if (xCurr < (xRange + yRange))
+                    {
+                        yCurr = yMin + (xCurr - xRange);
+                        xCurr = xMax;
+                    }
+                    else if (xCurr < (xRange + yRange + xRange))
+                    {
+                        yCurr = yMax;
+                        xCurr = xMin + (xCurr - (xRange + yRange));
+                    }
+                    else
+                    {
+                        yCurr = yMin + (xCurr - (xRange + yRange + xRange));
+                        xCurr = xMin;
+                    }
+                    point.Activate(xCurr,yCurr,index);
+                    index += 1;
                 }
+
+                // Do the actual work
+                foreach (LGPoint point in points.Where(point => point.Active))
+                {
+                    point.Advance(dt);
+                }
+
                 tCurr = (iter+1) * dt;
 
                 // For diagnostics - must take place AFTER tCurr advances

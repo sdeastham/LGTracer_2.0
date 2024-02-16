@@ -18,6 +18,9 @@ namespace LGTracer
         public bool Active
         { get; protected set; }
 
+        public uint UID
+        { get; protected set; }
+
         // Convenience properties
         public double X
         { 
@@ -30,15 +33,15 @@ namespace LGTracer
             set => _location[1] = value;
         }
 
-        public LGPoint( double x, double y, Func<double, double, (double, double)> vCalc )
+        public LGPoint( double x, double y, Func<double, double, (double, double)> vCalc, uint uniqueID )
         {
             this._location = Vector<double>.Build.Dense(2);
             this.InitialLocation = Vector<double>.Build.Dense(2);
             this.VelocityCalc = vCalc;
-            this.Activate(x,y);
+            this.Activate(x,y,uniqueID);
         }
 
-        public void Activate( double x, double y )
+        public void Activate( double x, double y, uint uniqueID )
         {
             // Change the particle from being inactive to active
             this.Active = true;
@@ -47,6 +50,7 @@ namespace LGTracer
             // Copy this data for later comparison
             this.InitialLocation[0] = x;
             this.InitialLocation[1] = y;
+            this.UID = uniqueID;
         }
 
         public void Deactivate()
