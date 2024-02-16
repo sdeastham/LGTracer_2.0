@@ -15,3 +15,5 @@ C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\obj\Debug
 C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\obj\Debug\net8.0\LGTracer_2.0.pdb
 C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\obj\Debug\net8.0\LGTracer_2.0.genruntimeconfig.cache
 C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\obj\Debug\net8.0\ref\LGTracer_2.0.dll
+C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\bin\Debug\net8.0\ScientificDataSet.dll
+C:\Users\sdeas\OneDrive - Imperial College London\Code\C#\LGTracer_2.0\obj\Debug\net8.0\LGTracer_2.0.sourcelink.json
