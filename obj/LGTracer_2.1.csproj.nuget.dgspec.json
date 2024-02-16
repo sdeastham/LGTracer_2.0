@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\LGTracer_3.0.csproj": {}
+    "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\LGTracer_2.1.csproj": {}
   },
   "projects": {
-    "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\LGTracer_3.0.csproj": {
+    "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\LGTracer_2.1.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\LGTracer_3.0.csproj",
-        "projectName": "LGTracer_3.0",
-        "projectPath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\LGTracer_3.0.csproj",
+        "projectUniqueName": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\LGTracer_2.1.csproj",
+        "projectName": "LGTracer_2.1",
+        "projectPath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\LGTracer_2.1.csproj",
         "packagesPath": "C:\\Users\\sdeas\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\obj\\",
+        "outputPath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\sdeas\\AppData\\Roaming\\NuGet\\NuGet.Config"

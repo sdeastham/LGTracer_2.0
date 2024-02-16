@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "KOUkxpnJ6AMwql9T61fR8/4k5CufMsDLJImhmknPAXf4Iw17zdcoav2qsZpmAK6DRjm5UZOrTU/i7QwEUByJuA==",
+  "dgSpecHash": "uop7LIJnQDGyfe53kZJj/pJzFCRBqTAqC5IVTKB2bLCyHCYl6elQPl/xG5sJN97HZiy/euFZz1SM3gVHoOaU/Q==",
   "success": true,
-  "projectFilePath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_3.0\\LGTracer_3.0.csproj",
+  "projectFilePath": "C:\\Users\\sdeas\\OneDrive - Imperial College London\\Code\\C#\\LGTracer_2.1\\LGTracer_2.1.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\sdeas\\.nuget\\packages\\mathnet.numerics\\5.0.0\\mathnet.numerics.5.0.0.nupkg.sha512",
     "C:\\Users\\sdeas\\.nuget\\packages\\sdslite\\3.0.1\\sdslite.3.0.1.nupkg.sha512"
