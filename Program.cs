@@ -34,10 +34,10 @@ namespace LGTracer
             };
 
             // Set up the mesh (units of meters)
-            double xMin = -100.0;
-            double xMax =  100.0;
+            double xMin = -200.0;
+            double xMax =  200.0;
             double xRange = xMax - xMin;
-            int xPosts = 201;
+            int xPosts = 401;
             int xCells = xPosts - 1;
             double dx = xRange/(xPosts - 1);
 
@@ -90,17 +90,17 @@ namespace LGTracer
             }
 
             double tStart = 0.0;
-            double tStop = 1000.0;
-            double dt = 1.0; // Time step in seconds
+            double tStop = 100.0;
+            double dt = 0.1; // Time step in seconds
             double tCurr = tStart;
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
 
             // How often to save out data?
-            double dtStorage = 10.0; // Storage period (seconds)
+            double dtStorage = 1.0; // Storage period (seconds)
             double tStorage = 0.0; // Next time that we want storage to occur
 
             // Number of Lagrangian points to track
-            int nPoints = 10;
+            int nPoints = 100;
 
             // This should all be put into a class for a single point and held in a list of points
             List<LGPoint> points = [];

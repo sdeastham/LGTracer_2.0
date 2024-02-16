@@ -1,4 +1,5 @@
 //using System.Numerics;
+using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 
 namespace LGTracer
@@ -12,6 +13,9 @@ namespace LGTracer
         { get; protected set; }
 
         public Func<double, double, (double, double)> VelocityCalc
+        { get; protected set; }
+
+        public bool Active
         { get; protected set; }
 
         // Convenience properties
@@ -29,27 +33,36 @@ namespace LGTracer
         public LGPoint( double x, double y, Func<double, double, (double, double)> vCalc )
         {
             this._location = Vector<double>.Build.Dense(2);
+            this.InitialLocation = Vector<double>.Build.Dense(2);
+            this.VelocityCalc = vCalc;
+            this.Activate(x,y);
+        }
+
+        public void Activate( double x, double y )
+        {
+            // Change the particle from being inactive to active
+            this.Active = true;
             this.X = x;
             this.Y = y;
-            this.VelocityCalc = vCalc;
-
             // Copy this data for later comparison
-            this.InitialLocation = Vector<double>.Build.Dense(2);
             this.InitialLocation[0] = x;
             this.InitialLocation[1] = y;
+        }
 
+        public void Deactivate()
+        {
+            // Kill the particle and put it into storage
+            this.Active = false;
+            this.X = double.NaN;
+            this.Y = double.NaN;
         }
 
         public void Advance( double dt )
         {
-            // Forward Euler
-            /*
-            // Get velocity vector at this location
-            ( double xSpeed, double ySpeed ) = VelocityCalc( X, Y );
-            // Simple forward Euler for now
-            X += xSpeed * dt;
-            Y += ySpeed * dt;
-            */
+            if (!Active)
+            {
+                return;
+            }
 
             // RK4
             ( double dx1, double dy1 ) = VelocityCalc( X, Y );
