@@ -34,8 +34,9 @@ namespace LGTracer
             };
 
             // Number of Lagrangian points to track
-            int nPoints = 5000;
+            int nPoints = 50000;
             int nInitial = 100; // Points to initially scatter randomly
+            float pointRate = 50; // Number of new points to add in each second
 
             // Set up the mesh (units of meters)
             double xMin = -200.0;
@@ -134,9 +135,10 @@ namespace LGTracer
             // Allow for 
             List<double[]> xHistory = [];
             List<double[]> yHistory = [];
+            List<uint[]> UIDHistory = [];
 
             // Store initial conditions
-            ArchiveConditions(time,xHistory,yHistory,tCurr,points);
+            ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,points);
             tStorage += dtStorage;
 
             bool loopOK = true;
@@ -144,11 +146,20 @@ namespace LGTracer
             double rErrPcg, thetaErrDeg, radius, thetaDeg;
             int iPoint, nInactive, nNew, nAvailable;
 
-            nNew = 50; // Number of new points to add at each time step
+            // We only add an integer number of points each time step
+            // If the number of points to be added is non-integer, retain
+            // the surplus and add it in at the next time step
+            double nNewExact;
+            double nSurplus = 0.0;
             
             Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
             for (int iter=0;iter<iterMax; iter++)
             {
+                // How many new points will we add (allowing for variable dt)?
+                nNewExact = (pointRate * dt) + nSurplus;
+                nNew = (int) Math.Floor(nNewExact);
+                nSurplus = nNewExact - (double)nNew;
+
                 // Counter of active points
                 iPoint = 0; // Counter, why not
 
@@ -208,6 +219,7 @@ namespace LGTracer
                     }
                     point.Activate(xCurr,yCurr,index);
                     index += 1;
+                    iPoint += 1;
                 }
 
                 // Do the actual work
@@ -223,7 +235,7 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    ArchiveConditions(time,xHistory,yHistory,tCurr,points);
+                    ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,points);
                     tStorage += dtStorage;
                 }
             }
@@ -232,7 +244,7 @@ namespace LGTracer
                 Console.WriteLine($"Stopped at time {tCurr}");
             }
 
-            bool success = WriteToFile(dsUri,time,xHistory,yHistory);
+            bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory);
             if (success)
             {
                 Console.WriteLine($"Output data successfully written to {fileName}");
@@ -243,7 +255,7 @@ namespace LGTracer
             }
 
         }
-        private static bool WriteToFile(NetCDFUri dsUri, List<double> time, List<double[]> xHistory, List<double[]> yHistory)
+        private static bool WriteToFile(NetCDFUri dsUri, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory)
         {
             bool success = true;
 
@@ -260,6 +272,7 @@ namespace LGTracer
             // Convert the lists into conventional 2D arrays
             double[,] x2D = new double[nTimes, nPoints];
             double[,] y2D = new double[nTimes, nPoints];
+            uint[,] UIDs = new uint[nTimes, nPoints];
 
             for (int i=0; i<nTimes; i++)
             {
@@ -267,6 +280,7 @@ namespace LGTracer
                 {
                     x2D[i,j] = xHistory[i][j];
                     y2D[i,j] = yHistory[i][j];
+                    UIDs[i,j] = UIDHistory[i][j];
                 }
             }
 
@@ -276,24 +290,28 @@ namespace LGTracer
                 ds.AddAxis("time","seconds",time.ToArray());
                 ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
+                ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
                 ds.Commit();
             }
             
             return success;
         }
-        private static void ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory,double tCurr, List<LGPoint> points)
+        private static void ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, List<LGPoint> points)
         {
             int nPoints = points.Count;
             double[] xPoints = new double[nPoints];
             double[] yPoints = new double[nPoints];
+            uint[] UIDs = new uint[nPoints];
             for (int i=0; i<nPoints; i++)
             {
                 xPoints[i] = points[i].X;
                 yPoints[i] = points[i].Y;
+                UIDs[i] = points[i].UID;
             }
             time.Add(tCurr);
             xHistory.Add(xPoints);
             yHistory.Add(yPoints);
+            UIDHistory.Add(UIDs);
         }
 
         private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, System.Random rng, int nPoints )
