@@ -118,7 +118,8 @@ namespace LGTracer
             for (int i=0;i<nPoints;i++)
             {
                 //points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega),index));
-                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityConst(x,y,5.0,2.0),index));
+                //points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityConst(x,y,5.0,2.0),index));
+                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed),index));
                 index += 1;
                 if (i >= nInitial)
                 {
@@ -152,7 +153,7 @@ namespace LGTracer
             double nNewExact;
             double nSurplus = 0.0;
             
-            Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
+            //Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
             for (int iter=0;iter<iterMax; iter++)
             {
                 // How many new points will we add (allowing for variable dt)?
@@ -199,23 +200,23 @@ namespace LGTracer
                     xCurr = rng.NextDouble() * ((xRange*2) + (yRange*2));
                     if (xCurr < xRange)
                     {
-                        yCurr = yMin;
+                        yCurr = yMin + (dy/100.0);
                         xCurr += xMin;
                     }
                     else if (xCurr < (xRange + yRange))
                     {
                         yCurr = yMin + (xCurr - xRange);
-                        xCurr = xMax;
+                        xCurr = xMax - (dx/100.0);
                     }
                     else if (xCurr < (xRange + yRange + xRange))
                     {
-                        yCurr = yMax;
+                        yCurr = yMax - (dy/100.0);
                         xCurr = xMin + (xCurr - (xRange + yRange));
                     }
                     else
                     {
                         yCurr = yMin + (xCurr - (xRange + yRange + xRange));
-                        xCurr = xMin;
+                        xCurr = xMin + (dx/100.0);
                     }
                     point.Activate(xCurr,yCurr,index);
                     index += 1;
@@ -369,12 +370,29 @@ namespace LGTracer
             // Return a fixed velocity
             return (xSpeed, ySpeed);
         }
-        private static (double, double) VelocityFromArray( double x, double y, double[,] xSpeedArray, double[,] ySpeedArray)
+        private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, Matrix<double> xSpeedArray, Matrix<double> ySpeedArray)
         {
             // Extract the velocity vector from an array
+            // Assumes constant X spacing and constant Y spacing
             double dxdt, dydt;
-            dxdt = 1.0;
-            dydt = 1.0;
+            if ((x >= xMax) || (y >= yMax))
+            {
+                // Propel point out of the domain
+                dxdt = 1.0;
+                dydt = 1.0;
+                return (dxdt, dydt);
+            }
+            if ((x <= xMin) || (y <= yMin))
+            {
+                dxdt = -1.0;
+                dydt = -1.0;
+                return (dxdt, dydt);
+            }
+            // If we made it this far - we are within the domain
+            int xIndex = (int)Math.Floor((x - xMin)/dx);
+            int yIndex = (int)Math.Floor((y - yMin)/dy);
+            dxdt = xSpeedArray[yIndex,xIndex];
+            dydt = ySpeedArray[yIndex,xIndex];
             return (dxdt, dydt);
         }
         private static (double, double) RThetaFromYX(double y, double x)
