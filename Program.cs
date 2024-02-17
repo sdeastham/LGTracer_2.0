@@ -117,11 +117,8 @@ namespace LGTracer
             // The point manager holds all the actual point data and controls velocity calculations
             //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
             //PointManager pointManager = new PointManager(nInitial,nPoints,vCalc);
-            PointManager pointManager = new PointManager(0,nPoints,xLims,yLims,
+            PointManager pointManager = new PointManager(nInitial,nPoints,xLims,yLims,
                 (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
-
-            // Assign the initial points to a field
-            pointManager.ScatterPoints(nInitial);
         
             // Set up output
             // Add a 2D variable
@@ -133,8 +130,9 @@ namespace LGTracer
             List<double[]> yHistory = [];
             List<uint[]> UIDHistory = [];
 
-            // Store initial conditions
-            ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
+            // Store initial conditions - keeping track of the largest number of points being
+            // tracked at any given output time
+            int maxActive = ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
             tStorage += dtStorage;
 
             bool loopOK = true;
@@ -176,7 +174,7 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
+                    maxActive = Math.Max(maxActive,ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager));
                     tStorage += dtStorage;
                 }
             }
@@ -185,7 +183,7 @@ namespace LGTracer
                 Console.WriteLine($"Stopped at time {tCurr}");
             }
 
-            bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory);
+            bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory,maxActive);
             if (success)
             {
                 Console.WriteLine($"Output data successfully written to {fileName}");
@@ -196,12 +194,12 @@ namespace LGTracer
             }
 
         }
-        private static bool WriteToFile(NetCDFUri dsUri, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory)
+        private static bool WriteToFile(NetCDFUri dsUri, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, int maxActive)
         {
             bool success = true;
 
             // Get the output sizes
-            int nPoints = xHistory[0].Length;
+            int nPoints = Math.Min(maxActive,xHistory[0].Length);
             int nTimes = time.Count;
 
             int[] index = new int[nPoints];
@@ -237,7 +235,7 @@ namespace LGTracer
             
             return success;
         }
-        private static void ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, PointManager pointManager)
+        private static int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, PointManager pointManager)
         {
             int nPoints = pointManager.MaxPoints;
             double[] xPoints = new double[nPoints];
@@ -263,6 +261,7 @@ namespace LGTracer
             xHistory.Add(xPoints);
             yHistory.Add(yPoints);
             UIDHistory.Add(UIDs);
+            return pointManager.NActive;
         }
 
         private static (double, double) RThetaAnalytical( double xInitial, double yInitial, double omega, double tCurr )
