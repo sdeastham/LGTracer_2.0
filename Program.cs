@@ -35,6 +35,7 @@ namespace LGTracer
 
             // Number of Lagrangian points to track
             int nPoints = 5000;
+            int nInitial = 100; // Points to initially scatter randomly
 
             // Set up the mesh (units of meters)
             double xMin = -200.0;
@@ -100,6 +101,10 @@ namespace LGTracer
 
             // How often to save out data?
             double dtStorage = 1.0; // Storage period (seconds)
+
+
+            // CODE STARTS HERE
+
             double tStorage = 0.0; // Next time that we want storage to occur
 
             // This should all be put into a class for a single point and held in a list of points
@@ -111,8 +116,13 @@ namespace LGTracer
             uint index = 0;
             for (int i=0;i<nPoints;i++)
             {
-                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega),index));
+                //points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega),index));
+                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityConst(x,y,5.0,2.0),index));
                 index += 1;
+                if (i >= nInitial)
+                {
+                    points[i].Deactivate();
+                }
             }
         
             // Set up output
@@ -175,7 +185,7 @@ namespace LGTracer
                     }
                     // Activate the point at a location randomly chosen from the domain edge
                     // Algorithm below basically goes around the edges of the domain in order
-                    xCurr = rng.NextDouble() * (xRange*2) + (yRange*2);
+                    xCurr = rng.NextDouble() * ((xRange*2) + (yRange*2));
                     if (xCurr < xRange)
                     {
                         yCurr = yMin;
@@ -333,6 +343,20 @@ namespace LGTracer
             (double radius, double theta) = RThetaFromYX(y,x);
             double dxdt = radius * omega * Trig.Sin(theta) * -1.0;
             double dydt = radius * omega * Trig.Cos(theta);
+            return (dxdt, dydt);
+        }
+
+        private static (double, double) VelocityConst( double x, double y, double xSpeed, double ySpeed)
+        {
+            // Return a fixed velocity
+            return (xSpeed, ySpeed);
+        }
+        private static (double, double) VelocityFromArray( double x, double y, double[,] xSpeedArray, double[,] ySpeedArray)
+        {
+            // Extract the velocity vector from an array
+            double dxdt, dydt;
+            dxdt = 1.0;
+            dydt = 1.0;
             return (dxdt, dydt);
         }
         private static (double, double) RThetaFromYX(double y, double x)
