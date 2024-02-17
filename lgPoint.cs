@@ -33,12 +33,16 @@ namespace LGTracer
             set => _location[1] = value;
         }
 
-        public LGPoint( double x, double y, Func<double, double, (double, double)> vCalc, uint uniqueID )
+        public LGPoint( Func<double, double, (double, double)> vCalc )
         {
             this._location = Vector<double>.Build.Dense(2);
             this.InitialLocation = Vector<double>.Build.Dense(2);
             this.VelocityCalc = vCalc;
-            this.Activate(x,y,uniqueID);
+            // Point starts inactive
+            this.X = double.NaN;
+            this.Y = double.NaN;
+            this.UID = 0;
+            this.Active = false;
         }
 
         public void Activate( double x, double y, uint uniqueID )

@@ -37,24 +37,29 @@ namespace LGTracer
             int nPoints = 50000;
             int nInitial = 100; // Points to initially scatter randomly
             float pointRate = 50; // Number of new points to add in each second
+            bool debug = false;
 
             // Set up the mesh (units of meters)
             double xMin = -200.0;
             double xMax =  200.0;
-            double xRange = xMax - xMin;
+            double xSpan = xMax - xMin;
             int xPosts = 401;
             int xCells = xPosts - 1;
-            double dx = xRange/(xPosts - 1);
+            double dx = xSpan/(xPosts - 1);
 
             double yMin = -200.0;
             double yMax =  200.0;
-            double yRange = yMax - yMin;
+            double ySpan = yMax - yMin;
             int yPosts = 401;
             int yCells = yPosts - 1;
-            double dy = yRange/(yPosts - 1);
+            double dy = ySpan/(yPosts - 1);
 
             // Rate of solid body rotation
             double omega = 0.05; // rad/s
+
+            // For convenience
+            double[] xLims = {xMin,xMax};
+            double[] yLims = {yMin,yMax};
 
             // X edges (meters)
             Vector<double> xMesh = Vector<double>.Build.Dense(xPosts);
@@ -80,6 +85,7 @@ namespace LGTracer
                 }
             }
 
+            // Create the velocity array
             // "Wind speed" in the x direction: m/s
             Matrix<double> xSpeed = Matrix<double>.Build.Dense(yCells,xCells);
 
@@ -108,24 +114,14 @@ namespace LGTracer
 
             double tStorage = 0.0; // Next time that we want storage to occur
 
-            // This should all be put into a class for a single point and held in a list of points
-            List<LGPoint> points = [];
+            // The point manager holds all the actual point data and controls velocity calculations
+            //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
+            //PointManager pointManager = new PointManager(nInitial,nPoints,vCalc);
+            PointManager pointManager = new PointManager(0,nPoints,xLims,yLims,
+                (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
 
-            // Get random values between zero and 1
-            System.Random rng = SystemRandomSource.Default;
-            (double[] xInitial, double[] yInitial) = MapRandomToXY(xMin,xMax,yMin,yMax,rng,nPoints);
-            uint index = 0;
-            for (int i=0;i<nPoints;i++)
-            {
-                //points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocitySolidBody(x,y,omega),index));
-                //points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityConst(x,y,5.0,2.0),index));
-                points.Add(new LGPoint(xInitial[i],yInitial[i],(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed),index));
-                index += 1;
-                if (i >= nInitial)
-                {
-                    points[i].Deactivate();
-                }
-            }
+            // Assign the initial points to a field
+            pointManager.ScatterPoints(nInitial);
         
             // Set up output
             // Add a 2D variable
@@ -133,13 +129,12 @@ namespace LGTracer
             List<double> time = [];
 
             // X of all points will be stored as a 2D array
-            // Allow for 
             List<double[]> xHistory = [];
             List<double[]> yHistory = [];
             List<uint[]> UIDHistory = [];
 
             // Store initial conditions
-            ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,points);
+            ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
             tStorage += dtStorage;
 
             bool loopOK = true;
@@ -161,73 +156,18 @@ namespace LGTracer
                 nNew = (int) Math.Floor(nNewExact);
                 nSurplus = nNewExact - (double)nNew;
 
-                // Counter of active points
-                iPoint = 0; // Counter, why not
-
-                // Audit points: what has left the domain?
-                foreach (LGPoint point in points.Where(point => point.Active))
-                {
-                    // Get the current location of the point and check that it's within bounds
-                    xCurr = point.X;
-                    yCurr = point.Y;
-
-                    if ((xCurr < xMin) || (xCurr >= xMax) || (yCurr < yMin) || (yCurr >= yMax))
-                    {
-                        // Retire the point and move on
-                        point.Deactivate();
-                    }
-
-                    iPoint += 1;
-                }
-                //Console.WriteLine($"{iPoint,5:d} points of {nPoints,5:d} active");
-                nInactive = nPoints - iPoint;
-
                 // We want to introduce nNew at the edge, but we can only go up to nInactive
-                nAvailable = Math.Min(nInactive,nNew);
-                iPoint = 0;
+                nAvailable = Math.Min(pointManager.MaxPoints - pointManager.NActive,nNew);
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
-                foreach (LGPoint point in points.Where(point => !point.Active))
-                {
-                    // Stop if we are out of available points
-                    if (iPoint >= nAvailable)
-                    {
-                        break;
-                    }
-                    // Activate the point at a location randomly chosen from the domain edge
-                    // Algorithm below basically goes around the edges of the domain in order
-                    xCurr = rng.NextDouble() * ((xRange*2) + (yRange*2));
-                    if (xCurr < xRange)
-                    {
-                        yCurr = yMin + (dy/100.0);
-                        xCurr += xMin;
-                    }
-                    else if (xCurr < (xRange + yRange))
-                    {
-                        yCurr = yMin + (xCurr - xRange);
-                        xCurr = xMax - (dx/100.0);
-                    }
-                    else if (xCurr < (xRange + yRange + xRange))
-                    {
-                        yCurr = yMax - (dy/100.0);
-                        xCurr = xMin + (xCurr - (xRange + yRange));
-                    }
-                    else
-                    {
-                        yCurr = yMin + (xCurr - (xRange + yRange + xRange));
-                        xCurr = xMin + (dx/100.0);
-                    }
-                    point.Activate(xCurr,yCurr,index);
-                    index += 1;
-                    iPoint += 1;
-                }
+                //Console.WriteLine($"Active before seeding: {pointManager.NActive}");
+                pointManager.SeedBoundary(nAvailable);
+                //Console.WriteLine($"Active after seeding:  {pointManager.NActive}");
 
                 // Do the actual work
-                foreach (LGPoint point in points.Where(point => point.Active))
-                {
-                    point.Advance(dt);
-                }
+                if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
+                pointManager.Advance(dt);
 
                 tCurr = (iter+1) * dt;
 
@@ -236,7 +176,7 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,points);
+                    ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
                     tStorage += dtStorage;
                 }
             }
@@ -297,17 +237,27 @@ namespace LGTracer
             
             return success;
         }
-        private static void ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, List<LGPoint> points)
+        private static void ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, PointManager pointManager)
         {
-            int nPoints = points.Count;
+            int nPoints = pointManager.MaxPoints;
             double[] xPoints = new double[nPoints];
             double[] yPoints = new double[nPoints];
             uint[] UIDs = new uint[nPoints];
             for (int i=0; i<nPoints; i++)
             {
-                xPoints[i] = points[i].X;
-                yPoints[i] = points[i].Y;
-                UIDs[i] = points[i].UID;
+                if (i<pointManager.NActive)
+                {
+                    LGPoint point = pointManager.ActivePoints[i];
+                    xPoints[i] = point.X;
+                    yPoints[i] = point.Y;
+                    UIDs[i] = point.UID;
+                }
+                else
+                {
+                    xPoints[i] = double.NaN;
+                    yPoints[i] = double.NaN;
+                    UIDs[i] = 0;
+                }
             }
             time.Add(tCurr);
             xHistory.Add(xPoints);
@@ -315,25 +265,6 @@ namespace LGTracer
             UIDHistory.Add(UIDs);
         }
 
-        private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, System.Random rng, int nPoints )
-        {
-            // Scatter randomly throughout domain
-            double xRange = xMax - xMin;
-            double xStart = xMin;
-            double xInner = xRange;
-            double yRange = yMax - yMin;
-            double yStart = yMin;
-            double yInner = yRange;
-
-            double[] xInitial = new double[nPoints];
-            double[] yInitial = new double[nPoints];
-            for (int i=0; i<nPoints; i++)
-            {
-                xInitial[i] = rng.NextDouble()*xInner + xStart;
-                yInitial[i] = rng.NextDouble()*yInner + yStart;
-            }
-            return (xInitial, yInitial);
-        }
         private static (double, double) RThetaAnalytical( double xInitial, double yInitial, double omega, double tCurr )
         {
             ( double radiusInitial, double thetaInitial ) = RThetaFromYX(yInitial, xInitial);
