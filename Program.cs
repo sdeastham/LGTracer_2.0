@@ -317,13 +317,13 @@ namespace LGTracer
 
         private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, System.Random rng, int nPoints )
         {
-            // Just map to the inner 50% of each range
+            // Scatter randomly throughout domain
             double xRange = xMax - xMin;
-            double xStart = xMin + (xRange/4.0);
-            double xInner = xRange/2.0;
+            double xStart = xMin;
+            double xInner = xRange;
             double yRange = yMax - yMin;
-            double yStart = yMin + (yRange/4.0);
-            double yInner = yRange/2.0;
+            double yStart = yMin;
+            double yInner = yRange;
 
             double[] xInitial = new double[nPoints];
             double[] yInitial = new double[nPoints];
