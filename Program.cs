@@ -346,7 +346,7 @@ namespace LGTracer
                 OpenMode = ResourceOpenMode.ReadOnly
             };
 
-            //Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
+            Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
             double[] lonEdge,latEdge;
             float[] lonMids, latMids;
             double[,] u,v;
@@ -367,14 +367,10 @@ namespace LGTracer
                 latBase = latMids[1] - (3.0*dLon/2.0);
 
                 // These indices are for the first and last cell _inclusive_
-                //latFirst = findLower(latLims[0],latBase,dLat);
-                //latLast  = findLower(latLims[1],latBase,dLat);
-                //lonFirst = findLower(lonLims[0],lonBase,dLon);
-                //lonLast  = findLower(lonLims[1],lonBase,dLon);
-                latFirst = (int)Math.Floor((latLims[0]-latBase)/dLat);
-                latLast  = (int)Math.Floor((latLims[1]-latBase)/dLat);
-                lonFirst = (int)Math.Floor((lonLims[0]-lonBase)/dLon);
-                lonLast  = (int)Math.Floor((lonLims[1]-lonBase)/dLon);
+                latFirst = findLower(latLims[0],latBase,dLat);
+                latLast  = findLower(latLims[1],latBase,dLat);
+                lonFirst = findLower(lonLims[0],lonBase,dLon);
+                lonLast  = findLower(lonLims[1],lonBase,dLon);
 
                 nLon = 1 + (lonLast - lonFirst);
                 nLat = 1 + (latLast - latFirst);
