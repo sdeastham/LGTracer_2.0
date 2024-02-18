@@ -46,10 +46,14 @@ namespace LGTracer
         private double[] YLims
         { get; set; }
 
+        private double[] BoundaryLengths
+        { get; set; }
+
         private bool Debug
         { get; set; }
 
-        public PointManager( int nInitial, int maxPoints, double[] xLims, double[] yLims, Func<double, double, (double, double)> vCalc, bool debug=false )
+        public PointManager( int nInitial, int maxPoints, double[] xLims, double[] yLims,
+                                Func<double, double, (double, double)> vCalc, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;

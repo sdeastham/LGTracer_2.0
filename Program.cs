@@ -101,6 +101,31 @@ namespace LGTracer
                 }
             }
 
+            // Boundary lengths (m)
+            double[] boundaryLengths = new double[xCells*2 + yCells*2];
+            double earthCircumference = 2.0 * Math.PI * LGConstants.EarthRadius;
+            double edgeLength;
+
+            // South boundary
+            edgeLength = (dx/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[0]);
+            for (int i=0;i<xCells;i++)
+            {
+                boundaryLengths[i] = edgeLength;
+            }
+            // North boundary
+            edgeLength = (dx/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[yPosts-1]);
+            for (int i=0;i<xCells;i++)
+            {
+                boundaryLengths[xCells + yCells + i] = edgeLength;
+            }
+            // All cells on the East and West boundaries have a constant length
+            edgeLength = (dy/360.0) * earthCircumference;
+            for (int i=0;i<yCells;i++)
+            {
+                boundaryLengths[xCells + i] = edgeLength;
+                boundaryLengths[(xCells*2) + yCells + i] = edgeLength;
+            }
+
             // Create the velocity array in m/s
             Matrix<double> xSpeed = Matrix<double>.Build.DenseOfArray(uWind);
             Matrix<double> ySpeed = Matrix<double>.Build.DenseOfArray(vWind);
@@ -278,37 +303,6 @@ namespace LGTracer
             return pointManager.NActive;
         }
 
-        private static (double, double) RThetaAnalytical( double xInitial, double yInitial, double omega, double tCurr )
-        {
-            ( double radiusInitial, double thetaInitial ) = RThetaFromYX(yInitial, xInitial);
-            double theta = thetaInitial + (tCurr * omega);
-            return (radiusInitial, theta);
-        }
-
-        private static (double, double, double, double) RThetaError( double xInitial, double yInitial, double omega, double tCurr, double x, double y)
-        {
-            (double radius, double theta) = RThetaFromYX(y,x);
-            (double radiusAnalytical, double thetaAnalytical) = RThetaAnalytical(xInitial,yInitial,omega,tCurr);
-            double rErrPcg,thetaErrDeg;
-            if (radius < 1.0e-10)
-            {
-                rErrPcg = double.NaN;
-            }
-            else
-            {
-                rErrPcg = 100.0 * (radius/radiusAnalytical - 1.0);
-            }
-            thetaErrDeg = Math.Abs((180.0/Math.PI)*Atan2(Trig.Sin(thetaAnalytical-theta),Trig.Cos(thetaAnalytical-theta)));
-            return (radius, rErrPcg, theta * 180.0/Math.PI, thetaErrDeg);
-        }
-        private static (double, double) VelocitySolidBody( double x, double y, double omega )
-        {
-            (double radius, double theta) = RThetaFromYX(y,x);
-            double dxdt = radius * omega * Trig.Sin(theta) * -1.0;
-            double dydt = radius * omega * Trig.Cos(theta);
-            return (dxdt, dydt);
-        }
-
         private static (double, double) VelocityConst( double x, double y, double xSpeed, double ySpeed)
         {
             // Return a fixed velocity
@@ -339,40 +333,6 @@ namespace LGTracer
             dxdt = LGConstants.Rad2Deg * xSpeedArray[yIndex,xIndex] / (LGConstants.EarthRadius * Math.Cos(LGConstants.Deg2Rad*y));
             dydt = LGConstants.Rad2Deg * ySpeedArray[yIndex,xIndex] / LGConstants.EarthRadius;
             return (dxdt, dydt);
-        }
-        private static (double, double) RThetaFromYX(double y, double x)
-        {
-            return (Math.Sqrt(x * x + y * y), Atan2(y,x));
-        }
-        private static double Atan2(double y, double x)
-        {
-            if (x>0)
-            {
-                return Trig.Atan(y/x);
-            }
-            else if ((x < 0) && (y >= 0 ))
-            {
-                return Trig.Atan(y/x) + Constants.Pi;
-            }
-            else if ((x < 0) && (y < 0 ))
-            {
-                return Trig.Atan(y/x) - Constants.Pi;
-            }
-            else // x == 0
-            {
-                if (y > 0)
-                {
-                    return Constants.Pi / 2.0;
-                }
-                else if (y < 0)
-                {
-                    return -1.0 * Constants.Pi / 2.0;
-                }
-                else
-                {
-                    return double.NaN;
-                }
-            }
         }
 
         private static (double [], double[], double[,], double[,] ) ReadMERRA2( string fileName, int time, int level, double[] lonLims, double[] latLims )
