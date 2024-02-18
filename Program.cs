@@ -44,7 +44,8 @@ namespace LGTracer
             double[] latLims = [-60.0,60.0];
             int readLevel = 30;
             int readTime = 0;
-            string metFileName = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
+            string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
+            string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
 
             // Major simulation settings
             double nDays = 30.0; // Days to run
@@ -52,7 +53,9 @@ namespace LGTracer
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
 
             // Read in MERRA-2 data and use that to set domain
-            (double[] lonEdge, double[] latEdge, double[,]uWind, double[,]vWind ) = ReadMERRA2( metFileName, readTime, readLevel, lonLims, latLims );
+            (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
+            // Now read in the U and V data
+            (double[,]uWind, double[,]vWind ) = MERRA2.ReadA3( metFileNameA3, readTime, readLevel, lonSet, latSet );
 
             // Set up the mesh (units of degrees)
             // The original lon/lat limits aren't important - need the mesh limits
@@ -315,6 +318,7 @@ namespace LGTracer
             // Return a fixed velocity
             return (xSpeed, ySpeed);
         }
+        
         private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, Matrix<double> xSpeedArray, Matrix<double> ySpeedArray)
         {
             // Extract the velocity vector from an array
@@ -342,78 +346,6 @@ namespace LGTracer
             return (dxdt, dydt);
         }
 
-        private static (double [], double[], double[,], double[,] ) ReadMERRA2( string fileName, int time, int level, double[] lonLims, double[] latLims )
-        {
-            // Returns [lon_edge],[lat_edge],[u],[v]
-            // Later extend to get T, QV
-            // Open netCDF4 file
-            var dsUri = new NetCDFUri
-            {
-                FileName = fileName,
-                OpenMode = ResourceOpenMode.ReadOnly
-            };
-
-            Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
-            double[] lonEdge,latEdge;
-            float[] lonMids, latMids;
-            double[,] u,v;
-            int nLon, nLat, lonFirst, latFirst, lonLast, latLast;
-            double dLon, dLat, lonBase, latBase;
-            using (DataSet ds = DataSet.Open(dsUri))
-            {
-                // Get the full dimension vectors
-                latMids = ds.GetData<float[]>("lat");
-                lonMids = ds.GetData<float[]>("lon");
-
-                // Figure out which cells we need to keep in order to get all the data we need
-                // Assume a fixed cell spacing for now
-                dLon = lonMids[1] - lonMids[0];
-                lonBase = lonMids[0] - (dLon/2.0);
-                // For latitude, be careful about half-polar grids
-                dLat = latMids[3] - latMids[2];
-                latBase = latMids[1] - (3.0*dLon/2.0);
-
-                // These indices are for the first and last cell _inclusive_
-                latFirst = findLower(latLims[0],latBase,dLat);
-                latLast  = findLower(latLims[1],latBase,dLat);
-                lonFirst = findLower(lonLims[0],lonBase,dLon);
-                lonLast  = findLower(lonLims[1],lonBase,dLon);
-
-                nLon = 1 + (lonLast - lonFirst);
-                nLat = 1 + (latLast - latFirst);
-
-                u = new double[nLat,nLon];
-                v = new double[nLat,nLon];
-
-                // Be lazy for the moment and access the whole array (not certain if this reads into memory or just makes it available?)
-                float[,,,] uFull = ds.GetData<float[,,,]>("U");
-                float[,,,] vFull = ds.GetData<float[,,,]>("V");
-
-                for (int iLon=0;iLon<nLon;iLon++)
-                {
-                    for (int iLat=0;iLat<nLat;iLat++)
-                    {
-                        u[iLat,iLon] = (double)uFull[time,level,iLat + latFirst,iLon + lonFirst];
-                        v[iLat,iLon] = (double)vFull[time,level,iLat + latFirst,iLon + lonFirst];
-                    }
-                }
-            }
-            // Create lon/lat edge vectors
-            lonEdge = new double[nLon+1];
-            latEdge = new double[nLat+1];
-            lonEdge[0] = lonMids[lonFirst] - (dLon/2.0);
-            latEdge[0] = latMids[latFirst] - (dLat/2.0);
-            for (int i=0;i<nLon;i++)
-            {
-                lonEdge[i+1] = lonEdge[0] + (dLon * (i+1));
-            }
-            for (int i=0;i<nLat;i++)
-            {
-                latEdge[i+1] = latEdge[0] + (dLat * (i+1));
-            }
-            
-            return (lonEdge, latEdge, u, v);
-        }
         private static (double[], double[]) SeedBoundary(int nPoints, double[] xLims, double[] yLims, System.Random RNG)
         {
             // Seed the domain boundaries - currently done evenly
