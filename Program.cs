@@ -145,10 +145,7 @@ namespace LGTracer
             tStorage += dtStorage;
             int nStored = 1;
 
-            bool loopOK = true;
-            double xCurr, yCurr;
-            double rErrPcg, thetaErrDeg, radius, thetaDeg;
-            int iPoint, nInactive, nNew, nAvailable;
+            int nNew, nAvailable;
 
             // We only add an integer number of points each time step
             // If the number of points to be added is non-integer, retain
@@ -156,7 +153,10 @@ namespace LGTracer
             double nNewExact;
             double nSurplus = 0.0;
             
-            //Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
+            // Set up timing
+            int nSteps = 0;
+            var watch = new Stopwatch();
+            watch.Start();
             Console.WriteLine("Beginning trajectory calculation");
             for (int iter=0;iter<iterMax; iter++)
             {
@@ -178,6 +178,7 @@ namespace LGTracer
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
                 pointManager.Advance(dt);
 
+                nSteps++;
                 tCurr = (iter+1) * dt;
 
                 // For diagnostics - must take place AFTER tCurr advances
@@ -190,10 +191,11 @@ namespace LGTracer
                     nStored += 1;
                 }
             }
-            if (loopOK)
-            {
-                Console.WriteLine($"Stopped at time {tCurr}");
-            }
+            watch.Stop();
+            long elapsedTimeLong = watch.ElapsedMilliseconds;
+            double elapsedTime = (double)elapsedTimeLong;
+            double msPerStep = elapsedTime/nSteps;
+            Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
             bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory,maxActive);
             if (success)
