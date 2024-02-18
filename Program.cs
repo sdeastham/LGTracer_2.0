@@ -316,11 +316,6 @@ namespace LGTracer
         }
         private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, Matrix<double> xSpeedArray, Matrix<double> ySpeedArray)
         {
-            // Radius of Earth in meters
-            const double rEarth = 6.371e6;
-            const double deg2rad = Math.PI / 180.0;
-            const double rad2deg = 180.0 / Math.PI;
-
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
             double dxdt, dydt;
@@ -341,8 +336,8 @@ namespace LGTracer
             int xIndex = (int)Math.Floor((x - xMin)/dx);
             int yIndex = (int)Math.Floor((y - yMin)/dy);
             // Convert from m/s to deg/s
-            dxdt = rad2deg * xSpeedArray[yIndex,xIndex] / (rEarth * Math.Cos(deg2rad*y));
-            dydt = rad2deg * ySpeedArray[yIndex,xIndex] / rEarth;
+            dxdt = LGConstants.Rad2Deg * xSpeedArray[yIndex,xIndex] / (LGConstants.EarthRadius * Math.Cos(LGConstants.Deg2Rad*y));
+            dydt = LGConstants.Rad2Deg * ySpeedArray[yIndex,xIndex] / LGConstants.EarthRadius;
             return (dxdt, dydt);
         }
         private static (double, double) RThetaFromYX(double y, double x)
