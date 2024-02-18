@@ -51,7 +51,8 @@ namespace LGTracer
 
         public PointManager( int nInitial, int maxPoints, double[] xLims, double[] yLims, Func<double, double, (double, double)> vCalc, bool debug=false )
         {
-            nextUID = 0;
+            // UIDs start from 1 (0 reserved for inactive points)
+            nextUID = 1;
 
             // Store the domain limits (should be 2-element vectors)
             XLims = xLims;

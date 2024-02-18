@@ -41,7 +41,7 @@ namespace LGTracer
             // Point starts inactive
             this.X = double.NaN;
             this.Y = double.NaN;
-            this.UID = 0;
+            this.UID = 0; // Reserved for inactive points
             this.Active = false;
         }
 
@@ -63,6 +63,7 @@ namespace LGTracer
             this.Active = false;
             this.X = double.NaN;
             this.Y = double.NaN;
+            this.UID = 0;
         }
 
         public void Advance( double dt )
