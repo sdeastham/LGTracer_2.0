@@ -40,8 +40,8 @@ namespace LGTracer
             bool debug = false;
 
             // Specify the domains
-            double[] lonLims = [-60.0,60.0];
-            double[] latLims = [-60.0,60.0];
+            double[] lonLims = [-150.0,30.0];
+            double[] latLims = [-15.0,75.0];
             int readLevel = 30;
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
