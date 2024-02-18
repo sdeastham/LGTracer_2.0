@@ -45,7 +45,7 @@ namespace LGTracer
             int readLevel = 30;
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
-            string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
+            string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.I3.05x0625.nc4";
 
             // Major simulation settings
             double nDays = 30.0; // Days to run
@@ -56,6 +56,8 @@ namespace LGTracer
             (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
             // Now read in the U and V data
             (double[,]uWind, double[,]vWind ) = MERRA2.ReadA3( metFileNameA3, readTime, readLevel, lonSet, latSet );
+            // Also read in PS, T, and QV
+            (double[,] surfacePressure, double[,]griddedTemperature, double[,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, readLevel, lonSet, latSet );
 
             // Set up the mesh (units of degrees)
             // The original lon/lat limits aren't important - need the mesh limits

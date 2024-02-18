@@ -80,15 +80,15 @@ namespace LGTracer
             int latFirst = latSet[0];
             int latLast  = latSet[1];
             int nLon, nLat;
+
+            nLon = 1 + (lonLast - lonFirst);
+            nLat = 1 + (latLast - latFirst);
+
+            u = new double[nLat,nLon];
+            v = new double[nLat,nLon];
             
             using (DataSet ds = DataSet.Open(dsUri))
             {
-                nLon = 1 + (lonLast - lonFirst);
-                nLat = 1 + (latLast - latFirst);
-
-                u = new double[nLat,nLon];
-                v = new double[nLat,nLon];
-
                 // Be lazy for the moment and access the whole array (not certain if this reads into memory or just makes it available?)
                 float[,,,] uFull = ds.GetData<float[,,,]>("U");
                 float[,,,] vFull = ds.GetData<float[,,,]>("V");
@@ -104,6 +104,57 @@ namespace LGTracer
             }
             
             return (u, v);
+        }
+
+        public static (double[,], double[,], double[,] ) ReadI3( string fileName, int time, int level, int[] lonSet, int[] latSet )
+        {
+            // Returns PS, T, QV
+            // Open netCDF4 file
+            var dsUri = new NetCDFUri
+            {
+                FileName = fileName,
+                OpenMode = ResourceOpenMode.ReadOnly
+            };
+
+            double[,] u,v;
+            int lonFirst = lonSet[0];
+            int lonLast  = lonSet[1];
+            int latFirst = latSet[0];
+            int latLast  = latSet[1];
+            int nLon, nLat;
+
+            nLon = 1 + (lonLast - lonFirst);
+            nLat = 1 + (latLast - latFirst);
+
+            double[,] ps = new double[nLat,nLon];
+            double[,] temperature = new double[nLat,nLon];
+            double[,] qv = new double[nLat,nLon];
+            
+            using (DataSet ds = DataSet.Open(dsUri))
+            {
+                // Be lazy for the moment and access the whole array (not certain if this reads into memory or just makes it available?)
+                float[,,] psFull           = ds.GetData<float[,,]>("PS");
+                float[,,,] temperatureFull = ds.GetData<float[,,,]>("T");
+                float[,,,] qvFull          = ds.GetData<float[,,,]>("QV");
+
+                for (int iLon=0;iLon<nLon;iLon++)
+                {
+                    for (int iLat=0;iLat<nLat;iLat++)
+                    {
+                        ps[iLat,iLon]          = (double)psFull[time,iLat + latFirst,iLon + lonFirst];
+                        temperature[iLat,iLon] = (double)temperatureFull[time,level,iLat + latFirst,iLon + lonFirst];
+                        qv[iLat,iLon]          = (double)qvFull[time,level,iLat + latFirst,iLon + lonFirst];
+                    }
+                }
+            }
+            
+            return (ps, temperature, qv);
+        }
+
+        public static double[,,] CalculatePressures(double[,] surfacePressure)
+        {
+            // Calculate pressures at grid cell edges given surface pressures
+            return null;
         }
     }
 }
