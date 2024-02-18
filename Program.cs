@@ -34,15 +34,15 @@ namespace LGTracer
             };
 
             // Number of Lagrangian points to track
-            int nPoints = 50000;
+            int nPoints = 100000;
             int nInitial = 1000; // Points to initially scatter randomly
             double pointRate = 50.0/3600.0; // Number of new points to add in each second
             bool debug = false;
 
             // Specify the domains
-            double[] lonLims = [-30.0,30.0];
-            double[] latLims = [-15.0,15.0];
-            int readLevel = 20;
+            double[] lonLims = [-60.0,60.0];
+            double[] latLims = [-60.0,60.0];
+            int readLevel = 30;
             int readTime = 0;
             string metFileName = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
 
