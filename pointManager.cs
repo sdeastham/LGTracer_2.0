@@ -37,27 +37,13 @@ namespace LGTracer
         public Func<double, double, (double, double)> VelocityCalc
         { get; protected set; }
 
-        private double[] XLims
-        { get; set; }
-
-        private double[] YLims
-        { get; set; }
-
-        private double[] BoundaryLengths
-        { get; set; }
-
         private bool Debug
         { get; set; }
 
-        public PointManager( int maxPoints, double[] xLims, double[] yLims,
-                                Func<double, double, (double, double)> vCalc, bool debug=false )
+        public PointManager( int maxPoints, Func<double, double, (double, double)> vCalc, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
-
-            // Store the domain limits (should be 2-element vectors)
-            XLims = xLims;
-            YLims = yLims;
 
             // Set the velocity calculation
             VelocityCalc = vCalc;
@@ -70,12 +56,6 @@ namespace LGTracer
 
             // Run in debug mode?
             Debug = debug;
-        }
-
-        public void UpdateDomain( double[] xLims, double[] yLims )
-        {
-            XLims = xLims;
-            YLims = yLims;
         }
 
         private LGPoint AddPoint( double x, double y )
@@ -123,6 +103,15 @@ namespace LGTracer
             return null;
         }
 
+        public void DeactivatePoint( int index )
+        {
+            // Deactivate point i of those present in ActivePoints
+            LGPoint point = ActivePoints[index];
+            InactivePoints.Add(point);
+            point.Deactivate();
+            ActivePoints.RemoveAt(index);
+        }
+
         public void CreatePointSet( double[] x, double[] y )
         {
             // Create multiple points
@@ -139,24 +128,6 @@ namespace LGTracer
             {
                 //Console.WriteLine($"{point.UID,5:d}: {point.X,7:f2}/{point.Y,7:f2}");
                 point.Advance(dt);
-            }
-            // If a point leaves the domain, it is deactivated
-            Cull();
-        }
-
-        public void Cull()
-        {
-            // Deactivate any points which are outside the domain
-            // Could also do this with LINQ
-            for (int i=NActive-1; i>=0; i--)
-            {
-                LGPoint point = ActivePoints[i];
-                if (point.X < XLims[0] || point.X >= XLims[1] || point.Y < YLims[0] || point.Y >= YLims[1] )
-                {
-                    InactivePoints.Add(point);
-                    point.Deactivate();
-                    ActivePoints.RemoveAt(i);
-                }
             }
         }
     }

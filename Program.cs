@@ -154,8 +154,7 @@ namespace LGTracer
             // The point manager holds all the actual point data and controls velocity calculations
             //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
             //PointManager pointManager = new PointManager(nInitial,nPoints,vCalc);
-            PointManager pointManager = new PointManager(nPoints,xLims,yLims,
-                (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
+            PointManager pointManager = new PointManager(nPoints,(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial) = MapRandomToXY(xLims[0],xLims[1],yLims[0],yLims[1],nInitial,RNG);
@@ -208,6 +207,8 @@ namespace LGTracer
                 // Do the actual work
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
                 pointManager.Advance(dt);
+
+                Cull(xLims,yLims,pointManager);
 
                 nSteps++;
                 tCurr = (iter+1) * dt;
@@ -476,6 +477,20 @@ namespace LGTracer
                 yInitial[i] = rng.NextDouble()*ySpan + yStart;
             }
             return (xInitial, yInitial);
+        }
+
+        private static void Cull(double[] xLims, double[] yLims, PointManager pointManager)
+        {
+            // Deactivate any points which are outside the domain
+            // Could also do this with LINQ
+            for (int i=pointManager.NActive-1; i>=0; i--)
+            {
+                LGPoint point = pointManager.ActivePoints[i];
+                if (point.X < xLims[0] || point.X >= xLims[1] || point.Y < yLims[0] || point.Y >= yLims[1] )
+                {
+                    pointManager.DeactivatePoint(i);
+                }
+            }
         }
     }
 }
