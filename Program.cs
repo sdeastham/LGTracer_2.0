@@ -35,84 +35,99 @@ namespace LGTracer
 
             // Number of Lagrangian points to track
             int nPoints = 50000;
-            int nInitial = 100; // Points to initially scatter randomly
-            float pointRate = 50; // Number of new points to add in each second
+            int nInitial = 1000; // Points to initially scatter randomly
+            double pointRate = 50.0/3600.0; // Number of new points to add in each second
             bool debug = false;
 
-            // Set up the mesh (units of meters)
-            double xMin = -200.0;
-            double xMax =  200.0;
-            double xSpan = xMax - xMin;
-            int xPosts = 401;
+            // Specify the domains
+            double[] lonLims = [-30.0,30.0];
+            double[] latLims = [-15.0,15.0];
+            int readLevel = 20;
+            int readTime = 0;
+            string metFileName = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
+
+            // Major simulation settings
+            double nDays = 30.0; // Days to run
+            double dt = 60.0 * 5.0; // Time step in seconds
+            double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
+
+            // Read in MERRA-2 data and use that to set domain
+            (double[] lonEdge, double[] latEdge, double[,]uWind, double[,]vWind ) = ReadMERRA2( metFileName, readTime, readLevel, lonLims, latLims );
+
+            // Set up the mesh (units of degrees)
+            // The original lon/lat limits aren't important - need the mesh limits
+            int xPosts = lonEdge.Length;
             int xCells = xPosts - 1;
-            double dx = xSpan/(xPosts - 1);
-
-            double yMin = -200.0;
-            double yMax =  200.0;
-            double ySpan = yMax - yMin;
-            int yPosts = 401;
+            int yPosts = latEdge.Length;
             int yCells = yPosts - 1;
-            double dy = ySpan/(yPosts - 1);
 
-            // Rate of solid body rotation
-            double omega = 0.05; // rad/s
+            double xMin  = lonEdge[0];
+            double xMax  =  lonEdge[xPosts-1];
+            double xSpan = xMax - xMin;
+            double yMin  = latEdge[0];
+            double yMax  = latEdge[yPosts-1];
+            double ySpan = yMax - yMin;
+            // Assume uniform spacing
+            double dx = xSpan/(xPosts - 1);
+            double dy = ySpan/(yPosts - 1);
 
             // For convenience
             double[] xLims = {xMin,xMax};
             double[] yLims = {yMin,yMax};
 
-            // X edges (meters)
+            // X edges (degrees)
             Vector<double> xMesh = Vector<double>.Build.Dense(xPosts);
             Vector<double> xMid = Vector<double>.Build.Dense(xCells);
             for (int i=0;i<xPosts;i++)
             {
-                xMesh[i] = xMin + (dx * i);
+                //xMesh[i] = xMin + (dx * i);
+                xMesh[i] = lonEdge[i];
                 if (i > 0)
                 {
                     xMid[i-1] = (xMesh[i] + xMesh[i-1])/2.0;
                 }
             }
 
-            // Y edges (meters)
+            // Y edges (degrees)
             Vector<double> yMesh = Vector<double>.Build.Dense(yPosts);
             Vector<double> yMid = Vector<double>.Build.Dense(yCells);
             for (int i=0;i<yPosts;i++)
             {
-                yMesh[i] = yMin + (dy * i);
+                //yMesh[i] = yMin + (dy * i);
+                yMesh[i] = latEdge[i];
                 if (i > 0)
                 {
                     yMid[i-1] = (yMesh[i] + yMesh[i-1])/2.0;
                 }
             }
 
-            // Create the velocity array
-            // "Wind speed" in the x direction: m/s
-            Matrix<double> xSpeed = Matrix<double>.Build.Dense(yCells,xCells);
+            // Create the velocity array in m/s
+            Matrix<double> xSpeed = Matrix<double>.Build.DenseOfArray(uWind);
+            Matrix<double> ySpeed = Matrix<double>.Build.DenseOfArray(vWind);
 
-            // "Wind speed" in the y direction: m/s
-            Matrix<double> ySpeed = Matrix<double>.Build.Dense(yCells,xCells);
-
+            // HACK: Convert m/s to deg/s by assuming roughly equatorial
+            Console.WriteLine("WARNING: Wind speed conversion is very approximate and invalid outside the tropics");
+            // Assume fixed value for meters per degree, then divide m/s to get deg/s (bleh)
+            double earthRadius = 6.371e6;
+            double roughWindConversion = 180.0 / (Math.PI * earthRadius);
             for (int i=0;i<xCells;i++)
             {
                 for (int j=0;j<yCells;j++)
                 {
-                    (xSpeed[j,i], ySpeed[j,i]) = VelocitySolidBody(xMid[i],yMid[j],omega);
+                    //(xSpeed[j,i], ySpeed[j,i]) = VelocitySolidBody(xMid[i],yMid[j],omega);
+                    xSpeed[j,i] = uWind[j,i] * roughWindConversion;
+                    ySpeed[j,i] = vWind[j,i] * roughWindConversion;
                 }
             }
 
-            double tStart = 0.0;
-            double tStop = 100.0;
-            double dt = 0.1; // Time step in seconds
-            double tCurr = tStart;
-            int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
-
-            // How often to save out data?
-            double dtStorage = 1.0; // Storage period (seconds)
-
 
             // CODE STARTS HERE
-
-            double tStorage = 0.0; // Next time that we want storage to occur
+            double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
+            double tStart = 0.0;
+            double tStop = tStart + duration;
+            double tCurr = tStart;
+            int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
+            double tStorage = tStart; // Next time that we want storage to occur
 
             // The point manager holds all the actual point data and controls velocity calculations
             //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
@@ -358,6 +373,83 @@ namespace LGTracer
                     return double.NaN;
                 }
             }
+        }
+
+        private static (double [], double[], double[,], double[,] ) ReadMERRA2( string fileName, int time, int level, double[] lonLims, double[] latLims )
+        {
+            // Returns [lon_edge],[lat_edge],[u],[v]
+            // Later extend to get T, QV
+            // Open netCDF4 file
+            var dsUri = new NetCDFUri
+            {
+                FileName = fileName,
+                OpenMode = ResourceOpenMode.ReadOnly
+            };
+
+            //Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
+            double[] lonEdge,latEdge;
+            float[] lonMids, latMids;
+            double[,] u,v;
+            int nLon, nLat, lonFirst, latFirst, lonLast, latLast;
+            double dLon, dLat, lonBase, latBase;
+            using (DataSet ds = DataSet.Open(dsUri))
+            {
+                // Get the full dimension vectors
+                latMids = ds.GetData<float[]>("lat");
+                lonMids = ds.GetData<float[]>("lon");
+
+                // Figure out which cells we need to keep in order to get all the data we need
+                // Assume a fixed cell spacing for now
+                dLon = lonMids[1] - lonMids[0];
+                lonBase = lonMids[0] - (dLon/2.0);
+                // For latitude, be careful about half-polar grids
+                dLat = latMids[3] - latMids[2];
+                latBase = latMids[1] - (3.0*dLon/2.0);
+
+                // These indices are for the first and last cell _inclusive_
+                //latFirst = findLower(latLims[0],latBase,dLat);
+                //latLast  = findLower(latLims[1],latBase,dLat);
+                //lonFirst = findLower(lonLims[0],lonBase,dLon);
+                //lonLast  = findLower(lonLims[1],lonBase,dLon);
+                latFirst = (int)Math.Floor((latLims[0]-latBase)/dLat);
+                latLast  = (int)Math.Floor((latLims[1]-latBase)/dLat);
+                lonFirst = (int)Math.Floor((lonLims[0]-lonBase)/dLon);
+                lonLast  = (int)Math.Floor((lonLims[1]-lonBase)/dLon);
+
+                nLon = 1 + (lonLast - lonFirst);
+                nLat = 1 + (latLast - latFirst);
+
+                u = new double[nLat,nLon];
+                v = new double[nLat,nLon];
+
+                // Be lazy for the moment and access the whole array (not certain if this reads into memory or just makes it available?)
+                float[,,,] uFull = ds.GetData<float[,,,]>("U");
+                float[,,,] vFull = ds.GetData<float[,,,]>("V");
+
+                for (int iLon=0;iLon<nLon;iLon++)
+                {
+                    for (int iLat=0;iLat<nLat;iLat++)
+                    {
+                        u[iLat,iLon] = (double)uFull[time,level,iLat + latFirst,iLon + lonFirst];
+                        v[iLat,iLon] = (double)vFull[time,level,iLat + latFirst,iLon + lonFirst];
+                    }
+                }
+            }
+            // Create lon/lat edge vectors
+            lonEdge = new double[nLon+1];
+            latEdge = new double[nLat+1];
+            lonEdge[0] = lonMids[lonFirst] - (dLon/2.0);
+            latEdge[0] = latMids[latFirst] - (dLat/2.0);
+            for (int i=0;i<nLon;i++)
+            {
+                lonEdge[i+1] = lonEdge[0] + (dLon * (i+1));
+            }
+            for (int i=0;i<nLat;i++)
+            {
+                latEdge[i+1] = latEdge[0] + (dLat * (i+1));
+            }
+            
+            return (lonEdge, latEdge, u, v);
         }
     }
 }
