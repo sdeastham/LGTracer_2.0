@@ -148,12 +148,19 @@ namespace LGTracer
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
             double tStorage = tStart; // Next time that we want storage to occur
 
+            // Central RNG for random point seeding
+            System.Random RNG = SystemRandomSource.Default;
+
             // The point manager holds all the actual point data and controls velocity calculations
             //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
             //PointManager pointManager = new PointManager(nInitial,nPoints,vCalc);
-            PointManager pointManager = new PointManager(nInitial,nPoints,xLims,yLims,
+            PointManager pointManager = new PointManager(nPoints,xLims,yLims,
                 (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
-        
+
+            // Scatter N points randomly over the domain
+            (double[] xInitial, double[] yInitial) = MapRandomToXY(xLims[0],xLims[1],yLims[0],yLims[1],nInitial,RNG);
+            pointManager.CreatePointSet(xInitial,yInitial);
+
             // Set up output
             // Add a 2D variable
             // Define dimensions (variables)
@@ -195,9 +202,8 @@ namespace LGTracer
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
-                //Console.WriteLine($"Active before seeding: {pointManager.NActive}");
-                pointManager.SeedBoundary(nAvailable);
-                //Console.WriteLine($"Active after seeding:  {pointManager.NActive}");
+                (double[] xSet, double[] ySet) = SeedBoundary(nAvailable,xLims,yLims,RNG);
+                pointManager.CreatePointSet(xSet, ySet);
 
                 // Do the actual work
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
@@ -406,6 +412,70 @@ namespace LGTracer
             }
             
             return (lonEdge, latEdge, u, v);
+        }
+        private static (double[], double[]) SeedBoundary(int nPoints, double[] xLims, double[] yLims, System.Random RNG)
+        {
+            // Seed the domain boundaries - currently done evenly
+            double xMin = xLims[0];
+            double xMax = xLims[1];
+            double xSpan = xMax - xMin;
+            double yMin = yLims[0];
+            double yMax = yLims[1];
+            double ySpan = yMax - yMin;
+            double xCurr, yCurr;
+            double smallDelta = 1.0e-5;
+            double randomVal;
+
+            double[] xVals = new double[nPoints];
+            double[] yVals = new double[nPoints];
+            
+            for (int i=0; i<nPoints; i++)
+            {
+                // Activate the point at a location randomly chosen from the domain edge
+                // Algorithm below basically goes around the edges of the domain in order
+                randomVal = RNG.NextDouble() * ((xSpan*2) + (ySpan*2));
+                if (randomVal < xSpan)
+                {
+                    yCurr = yMin + smallDelta;
+                    xCurr = xMin + randomVal;
+                }
+                else if (randomVal < (xSpan + ySpan))
+                {
+                    yCurr = yMin + (randomVal - xSpan);
+                    xCurr = xMax - smallDelta;
+                }
+                else if (randomVal < (xSpan + ySpan + xSpan))
+                {
+                    yCurr = yMax - smallDelta;
+                    xCurr = xMin + (randomVal - (xSpan + ySpan));
+                }
+                else
+                {
+                    yCurr = yMin + (randomVal - (xSpan + ySpan + xSpan));
+                    xCurr = xMin + smallDelta;
+                }
+                xVals[i] = xCurr;
+                yVals[i] = yCurr;
+            }
+            return (xVals, yVals);
+        }
+
+        private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
+        {
+            // Scatter randomly throughout domain
+            double xSpan = xMax - xMin;
+            double xStart = xMin;
+            double ySpan = yMax - yMin;
+            double yStart = yMin;
+
+            double[] xInitial = new double[nPoints];
+            double[] yInitial = new double[nPoints];
+            for (int i=0; i<nPoints; i++)
+            {
+                xInitial[i] = rng.NextDouble()*xSpan + xStart;
+                yInitial[i] = rng.NextDouble()*ySpan + yStart;
+            }
+            return (xInitial, yInitial);
         }
     }
 }

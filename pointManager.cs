@@ -37,9 +37,6 @@ namespace LGTracer
         public Func<double, double, (double, double)> VelocityCalc
         { get; protected set; }
 
-        private System.Random RNG
-        { get; set; }
-
         private double[] XLims
         { get; set; }
 
@@ -52,7 +49,7 @@ namespace LGTracer
         private bool Debug
         { get; set; }
 
-        public PointManager( int nInitial, int maxPoints, double[] xLims, double[] yLims,
+        public PointManager( int maxPoints, double[] xLims, double[] yLims,
                                 Func<double, double, (double, double)> vCalc, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
@@ -65,18 +62,11 @@ namespace LGTracer
             // Set the velocity calculation
             VelocityCalc = vCalc;
 
-            // Create a random number generator for boundary seeding
-            RNG = SystemRandomSource.Default;
+            // Limit on how many points can be managed
             MaxPoints = maxPoints;
 
             ActivePoints = [];
             InactivePoints = [];
-
-            // If any active points requested, scatter them
-            if (nInitial > 0)
-            {
-                ScatterPoints(nInitial);
-            }
 
             // Run in debug mode?
             Debug = debug;
@@ -133,6 +123,15 @@ namespace LGTracer
             return null;
         }
 
+        public void CreatePointSet( double[] x, double[] y )
+        {
+            // Create multiple points
+            for (int i=0; i<x.Length; i++)
+            {
+                NextPoint(x[i],y[i]);
+            }
+        }
+
         public void Advance( double dt )
         {
             // Advances all active points one time step
@@ -159,77 +158,6 @@ namespace LGTracer
                     ActivePoints.RemoveAt(i);
                 }
             }
-        }
-
-        public void SeedBoundary(int nPoints)
-        {
-            // Seed the domain boundaries - currently done evenly
-            double xMin = XLims[0];
-            double xMax = XLims[1];
-            double xSpan = xMax - xMin;
-            double yMin = YLims[0];
-            double yMax = YLims[1];
-            double ySpan = yMax - yMin;
-            double xCurr, yCurr;
-            double smallDelta = 1.0e-5;
-            double randomVal;
-            
-            for (int i=0; i<nPoints; i++)
-            {
-                // Activate the point at a location randomly chosen from the domain edge
-                // Algorithm below basically goes around the edges of the domain in order
-                randomVal = RNG.NextDouble() * ((xSpan*2) + (ySpan*2));
-                if (randomVal < xSpan)
-                {
-                    yCurr = yMin + smallDelta;
-                    xCurr = xMin + randomVal;
-                }
-                else if (randomVal < (xSpan + ySpan))
-                {
-                    yCurr = yMin + (randomVal - xSpan);
-                    xCurr = xMax - smallDelta;
-                }
-                else if (randomVal < (xSpan + ySpan + xSpan))
-                {
-                    yCurr = yMax - smallDelta;
-                    xCurr = xMin + (randomVal - (xSpan + ySpan));
-                }
-                else
-                {
-                    yCurr = yMin + (randomVal - (xSpan + ySpan + xSpan));
-                    xCurr = xMin + smallDelta;
-                }
-                NextPoint(xCurr,yCurr);
-            }
-        }
-
-        public void ScatterPoints(int nPoints)
-        {
-            // Scatter N points randomly over the domain
-            (double[] x, double[] y) = MapRandomToXY(XLims[0],XLims[1],YLims[0],YLims[1],nPoints,RNG);
-            
-            for (int i=0; i<nPoints; i++)
-            {
-                NextPoint(x[i],y[i]);
-            }
-        }
-
-        private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
-        {
-            // Scatter randomly throughout domain
-            double xSpan = xMax - xMin;
-            double xStart = xMin;
-            double ySpan = yMax - yMin;
-            double yStart = yMin;
-
-            double[] xInitial = new double[nPoints];
-            double[] yInitial = new double[nPoints];
-            for (int i=0; i<nPoints; i++)
-            {
-                xInitial[i] = rng.NextDouble()*xSpan + xStart;
-                yInitial[i] = rng.NextDouble()*ySpan + yStart;
-            }
-            return (xInitial, yInitial);
         }
     }
 }
