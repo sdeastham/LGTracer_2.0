@@ -104,19 +104,13 @@ namespace LGTracer
             // Create the velocity array in m/s
             Matrix<double> xSpeed = Matrix<double>.Build.DenseOfArray(uWind);
             Matrix<double> ySpeed = Matrix<double>.Build.DenseOfArray(vWind);
-
-            // HACK: Convert m/s to deg/s by assuming roughly equatorial
-            Console.WriteLine("WARNING: Wind speed conversion is very approximate and invalid outside the tropics");
-            // Assume fixed value for meters per degree, then divide m/s to get deg/s (bleh)
-            double earthRadius = 6.371e6;
-            double roughWindConversion = 180.0 / (Math.PI * earthRadius);
             for (int i=0;i<xCells;i++)
             {
                 for (int j=0;j<yCells;j++)
                 {
                     //(xSpeed[j,i], ySpeed[j,i]) = VelocitySolidBody(xMid[i],yMid[j],omega);
-                    xSpeed[j,i] = uWind[j,i] * roughWindConversion;
-                    ySpeed[j,i] = vWind[j,i] * roughWindConversion;
+                    xSpeed[j,i] = uWind[j,i];// * roughWindConversion;
+                    ySpeed[j,i] = vWind[j,i];// * roughWindConversion;
                 }
             }
 
@@ -149,6 +143,7 @@ namespace LGTracer
             // tracked at any given output time
             int maxActive = ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
             tStorage += dtStorage;
+            int nStored = 1;
 
             bool loopOK = true;
             double xCurr, yCurr;
@@ -162,6 +157,7 @@ namespace LGTracer
             double nSurplus = 0.0;
             
             //Console.WriteLine($"Rotational speed: {dt * omega * 180.0/Math.PI,7:f2} deg/timestep");
+            Console.WriteLine("Beginning trajectory calculation");
             for (int iter=0;iter<iterMax; iter++)
             {
                 // How many new points will we add (allowing for variable dt)?
@@ -191,6 +187,7 @@ namespace LGTracer
                 {
                     maxActive = Math.Max(maxActive,ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager));
                     tStorage += dtStorage;
+                    nStored += 1;
                 }
             }
             if (loopOK)
@@ -201,7 +198,7 @@ namespace LGTracer
             bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory,maxActive);
             if (success)
             {
-                Console.WriteLine($"Output data successfully written to {fileName}");
+                Console.WriteLine($"Output data with {nStored} samples successfully written to {fileName}");
             }
             else
             {
@@ -317,6 +314,11 @@ namespace LGTracer
         }
         private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, Matrix<double> xSpeedArray, Matrix<double> ySpeedArray)
         {
+            // Radius of Earth in meters
+            const double rEarth = 6.371e6;
+            const double deg2rad = Math.PI / 180.0;
+            const double rad2deg = 180.0 / Math.PI;
+
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
             double dxdt, dydt;
@@ -336,8 +338,9 @@ namespace LGTracer
             // If we made it this far - we are within the domain
             int xIndex = (int)Math.Floor((x - xMin)/dx);
             int yIndex = (int)Math.Floor((y - yMin)/dy);
-            dxdt = xSpeedArray[yIndex,xIndex];
-            dydt = ySpeedArray[yIndex,xIndex];
+            // Convert from m/s to deg/s
+            dxdt = rad2deg * xSpeedArray[yIndex,xIndex] / (rEarth * Math.Cos(deg2rad*y));
+            dydt = rad2deg * ySpeedArray[yIndex,xIndex] / rEarth;
             return (dxdt, dydt);
         }
         private static (double, double) RThetaFromYX(double y, double x)
