@@ -53,7 +53,7 @@ namespace LGTracer
 
             // Point settings
             double pressureDelta = 10.0e2; // Layer pressure thickness in Pa. This helps to determine how many points to seed
-            double kgPerPoint = 6.0e10; // Air mass represented by a single point (mass flows are huge - but 1e9 seems very high?)
+            double kgPerPoint = 2.0e12; // Air mass represented by a single point (mass flows are huge - but 1e11 seems very high? Total atm mass 5.1e18!)
 
 
             // CODE STARTS HERE
@@ -198,6 +198,7 @@ namespace LGTracer
             // the surplus and add it in at the next time step
             double nNewExact;
             double nSurplus = 0.0;
+            double massSurplus = 0.0;
             
             // Set up timing
             int nSteps = 0;
@@ -217,8 +218,8 @@ namespace LGTracer
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
                 //(double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
-                (double[] xSet, double[] ySet) = SeedBoundary(kgPerPoint, boundaryLengths, pressureDelta, dt,
-                    xyPosts, boundaryNormals, vBoundary, RNG);
+                (double[] xSet, double[] ySet, massSurplus) = SeedBoundary(kgPerPoint, boundaryLengths, pressureDelta, dt,
+                    xyPosts, boundaryNormals, vBoundary, RNG, massSurplus);
 
                 pointManager.CreatePointSet(xSet, ySet);
 
@@ -250,7 +251,7 @@ namespace LGTracer
             bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory,maxActive);
             if (success)
             {
-                Console.WriteLine($"Output data with {nStored} samples successfully written to {fileName}");
+                Console.WriteLine($"Output data with {nStored} samples [max points stored: {maxActive}] successfully written to {fileName}");
             }
             else
             {
@@ -492,61 +493,78 @@ namespace LGTracer
             }
             return vBoundary;
         }
-        private static (double[], double[]) SeedBoundary(double kgPerPoint, double[] boundaryLengths, double pressureDelta, double dt,
-            Vector2[] boundaryPosts, Vector2[] boundaryNormals, Vector2[] vBoundary, System.Random RNG)
+        private static (double[], double[], double) SeedBoundary(double kgPerPoint, double[] boundaryLengths, double pressureDelta, double dt,
+            Vector2[] boundaryPosts, Vector2[] boundaryNormals, Vector2[] vBoundary, System.Random RNG, double massSurplus = 0.0)
         {
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
             int nEdges = boundaryPosts.Length - 1; // First post is duplicated as last post
             double smallDelta = 1.0e-5;
-            double randomVal;
-            double massFlowRate;
+            double massFlux, cellFrac, randomVal;
             double pointSurplus = 0.0;
             double nPoints;
             Vector2 pointLocation, boundaryVector;
-            int[] nPointsLocal = new int[nEdges];
             double vNorm;
+            double[] massFluxes = new double[nEdges];
+            double[] weighting;
 
             for (int i=0; i<nEdges; i++)
             {
                 // Mass flow rate across the boundary in kg/s
                 vNorm = (double)Vector2.Dot(vBoundary[i],boundaryNormals[i]);
-                massFlowRate = vNorm * boundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
-                // No need to continue if the flow rate is negative
-                if (massFlowRate <= 0.0)
-                {
-                    nPointsLocal[i] = 0;
-                    continue;
-                }
-                // Add on any leftover mass from the previous cell, and then figure out the number of points to use
-                nPoints = pointSurplus + (massFlowRate*dt/kgPerPoint);
-                nPointsLocal[i] = (int)Math.Floor(nPoints);
-                pointSurplus = nPoints - (double)nPointsLocal[i];
-                //Console.WriteLine($"VNORM {vNorm,6:f2} --> FLOWRATE {massFlowRate/1.0e6,6:f2} --> N {nPointsLocal[i],4:d}");
+                massFlux = dt * vNorm * boundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
+                massFluxes[i] = Math.Max(0.0,massFlux);
             }
 
-            int nPointsTotal = nPointsLocal.Sum();
+            // We now know the total mass flux - use to figure out weightings
+            massFlux = massFluxes.Sum();
+            weighting = new double[nEdges];
+            for (int i=0; i<nEdges; i++)
+            {
+                // Cumulative
+                weighting[i] = (massFluxes[i] / massFlux);
+                if (i>0)
+                {
+                    weighting[i] += weighting[i-1];
+                }
+            }
+            // Force to 1.0 to ensure we don't accidentally miss anything
+            weighting[nEdges-1] = 1.0;
+
+            // How many points will we add (add mass surplus)?
+            nPoints = (massFlux + massSurplus)/kgPerPoint;
+            int nPointsTotal = (int)Math.Floor(nPoints);
+
+            // Unused mass
+            massSurplus = (nPoints - (double)nPointsTotal) * kgPerPoint;
+
             //Console.WriteLine($"Expecting {nPointsTotal} new points");
             double[] xVals = new double[nPointsTotal];
             double[] yVals = new double[nPointsTotal];
-            int iPointTotal = 0;
-
-            for (int i=0; i<nEdges; i++)
+            int iCell;
+            for (int iPoint=0; iPoint < nPointsTotal; iPoint++)
             {
-                // Allocate the points randomly along the boundary
-                if (nPointsLocal[i] == 0) {continue;}
-                boundaryVector = boundaryPosts[i+1] - boundaryPosts[i];
-                for (int iPoint=0; iPoint < nPointsLocal[i]; iPoint++ )
+                randomVal = RNG.NextDouble();
+                iCell = 0;
+                while (weighting[iCell] < randomVal)
                 {
-                    randomVal = RNG.NextDouble();
-                    pointLocation = boundaryPosts[i] + ((float)randomVal * boundaryVector) + ((float)smallDelta * boundaryNormals[i]);
-                    xVals[iPointTotal] = pointLocation.X;
-                    yVals[iPointTotal] = pointLocation.Y;
-                    iPointTotal++;
-                    //Console.WriteLine($"Point {iPointTotal,6:d}: X0Y0 {boundaryPosts[i]}/X1Y1 {boundaryPosts[i+1]}/XY {pointLocation}");
+                    iCell++;
                 }
+                boundaryVector = boundaryPosts[iCell+1] - boundaryPosts[iCell];
+                // Remainder of randomVal used to figure out how far along the cell we go
+                if (iCell > 0)
+                {
+                    cellFrac = (randomVal - weighting[iCell-1])/(weighting[iCell] - weighting[iCell-1]);
+                }
+                else
+                { 
+                    cellFrac = randomVal/weighting[0];
+                }
+                pointLocation = boundaryPosts[iCell] + ((float)cellFrac * boundaryVector) + ((float)smallDelta * boundaryNormals[iCell]);
+                xVals[iPoint] = pointLocation.X;
+                yVals[iPoint] = pointLocation.Y;
             }
-            return (xVals, yVals);
+            return (xVals, yVals, massSurplus);
         }
 
         private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
