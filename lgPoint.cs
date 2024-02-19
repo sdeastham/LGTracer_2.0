@@ -6,10 +6,10 @@ namespace LGTracer
 {
     public class LGPoint
     {
-        protected Vector<double> _location
+        protected double[] _location
         { get; set; }
 
-        public Vector<double> InitialLocation
+        public double[] InitialLocation
         { get; protected set; }
 
         public Func<double, double, (double, double)> VelocityCalc
@@ -35,8 +35,8 @@ namespace LGTracer
 
         public LGPoint( Func<double, double, (double, double)> vCalc )
         {
-            this._location = Vector<double>.Build.Dense(2);
-            this.InitialLocation = Vector<double>.Build.Dense(2);
+            this._location = new double[2];
+            this.InitialLocation = new double[2];
             this.VelocityCalc = vCalc;
             // Point starts inactive
             this.X = double.NaN;

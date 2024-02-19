@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 
 using MathNet.Numerics;
-using MathNet.Numerics.LinearAlgebra;
-using MathNet.Numerics.LinearAlgebra.Double;
+//using MathNet.Numerics.LinearAlgebra;
+//using MathNet.Numerics.LinearAlgebra.Double;
 using MathNet.Numerics.Interpolation;
-using MathNet.Numerics.Integration;
+//using MathNet.Numerics.Integration;
 using MathNet.Numerics.Random;
-using MathNet.Numerics.Distributions;
+//using MathNet.Numerics.Distributions;
 
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
@@ -81,11 +81,10 @@ namespace LGTracer
             double[] yLims = {yMin,yMax};
 
             // X edges (degrees)
-            Vector<double> xMesh = Vector<double>.Build.Dense(xPosts);
-            Vector<double> xMid = Vector<double>.Build.Dense(xCells);
+            double[] xMesh = new double[xPosts];
+            double[] xMid = new double[xCells];
             for (int i=0;i<xPosts;i++)
             {
-                //xMesh[i] = xMin + (dx * i);
                 xMesh[i] = lonEdge[i];
                 if (i > 0)
                 {
@@ -94,8 +93,8 @@ namespace LGTracer
             }
 
             // Y edges (degrees)
-            Vector<double> yMesh = Vector<double>.Build.Dense(yPosts);
-            Vector<double> yMid = Vector<double>.Build.Dense(yCells);
+            double[] yMesh = new double[yPosts];
+            double[] yMid  = new double[yCells];
             for (int i=0;i<yPosts;i++)
             {
                 //yMesh[i] = yMin + (dy * i);
@@ -132,8 +131,8 @@ namespace LGTracer
             }
 
             // Create the velocity array in m/s
-            Matrix<double> xSpeed = Matrix<double>.Build.DenseOfArray(uWind);
-            Matrix<double> ySpeed = Matrix<double>.Build.DenseOfArray(vWind);
+            double[,] xSpeed = new double[yCells,xCells];
+            double[,] ySpeed = new double[yCells,xCells];
             for (int i=0;i<xCells;i++)
             {
                 for (int j=0;j<yCells;j++)
@@ -164,6 +163,9 @@ namespace LGTracer
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial) = MapRandomToXY(xLims[0],xLims[1],yLims[0],yLims[1],nInitial,RNG);
             pointManager.CreatePointSet(xInitial,yInitial);
+
+            // Define boundary edges, normals etc
+            //( xyPosts, Vector<double>[] boundaryNormals) = createBoundary(xMesh,yMesh);
 
             // Set up output
             // Add a 2D variable
@@ -206,7 +208,7 @@ namespace LGTracer
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
-                (double[] xSet, double[] ySet) = SeedBoundary(nAvailable,xLims,yLims,RNG);
+                (double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
                 pointManager.CreatePointSet(xSet, ySet);
 
                 // Do the actual work
@@ -321,7 +323,7 @@ namespace LGTracer
             return (xSpeed, ySpeed);
         }
         
-        private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, Matrix<double> xSpeedArray, Matrix<double> ySpeedArray)
+        private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, double[,] xSpeedArray, double[,] ySpeedArray)
         {
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
@@ -348,9 +350,9 @@ namespace LGTracer
             return (dxdt, dydt);
         }
 
-        private static (double[], double[]) SeedBoundary(int nPoints, double[] xLims, double[] yLims, System.Random RNG)
+        private static (double[], double[]) SeedBoundaryUniform(int nPoints, double[] xLims, double[] yLims, System.Random RNG)
         {
-            // Seed the domain boundaries - currently done evenly
+            // Seed the domain boundaries completely uniformly
             double xMin = xLims[0];
             double xMax = xLims[1];
             double xSpan = xMax - xMin;
@@ -394,6 +396,70 @@ namespace LGTracer
             }
             return (xVals, yVals);
         }
+
+        /*
+        private static (Vector2[], Vector2[]) createBoundary( double[] xMesh, double[] yMesh)
+        {
+            // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
+            // Number of individual edge cells + 1
+            int xPosts = xMesh.Length;
+            int yPosts = yMesh.Length;
+            int nPosts = ((xPosts - 1) * 2) + ((yPosts - 1) * 2) + 1;
+            Vector<double>[] xyPosts = new Vector<double>[nPosts];
+            double[] xy = new double[2];
+            // Define the first post
+            xy = [xMesh[0],yMesh[0]];
+            xyPosts[0] = Vector<double>.Build.DenseOfArray(xy);
+            int currPost = 1;
+            // South boundary
+            for (int i=1; i<xPosts; i++)
+            {
+                xy = [xMesh[i],yMesh[0]];
+                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                currPost++;
+            }
+            // East boundary
+            for (int i=1; i<yPosts; i++)
+            {
+                xy = [xMesh[xPosts-1],yMesh[i]];
+                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                currPost++;
+            }
+            // North boundary
+            for (int i=xPosts-2; i>=0; i--)
+            {
+                xy = [xMesh[i],yMesh[yPosts-1]];
+                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                currPost++;
+            }
+            // West boundary (assume closure - ie do not include a final post identical to the first)
+            for (int i=yPosts-2; i>=1; i--)
+            {
+                xy = [xMesh[0],yMesh[i]];
+                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                currPost++;
+            }
+            // Now the boundary normals
+
+            return (xyPosts,xyPosts);
+        }
+        */
+
+        /*
+        private static (double[], double[]) SeedBoundaryAccurate(int nPoints, double[] boundaryLengths, double pressureDelta, 
+            Vector<double>[] boundaryEdges, Vector<double>[] boundaryNormals, Vector<double>[] vBoundary, System.Random RNG)
+        {
+            // Seed the domain boundaries proportional to mass flow rate
+            // Position along boundary for each cell is random
+            double xCurr, yCurr;
+            double smallDelta = 1.0e-5;
+            double randomVal;
+
+            double[] xVals = new double[nPoints];
+            double[] yVals = new double[nPoints];
+            return (xVals, yVals);
+        }
+        */
 
         private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
         {
