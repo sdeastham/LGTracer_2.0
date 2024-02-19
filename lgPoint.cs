@@ -1,6 +1,4 @@
 using System.Numerics;
-//using MathNet.Numerics;
-//using MathNet.Numerics.LinearAlgebra;
 
 namespace LGTracer
 {

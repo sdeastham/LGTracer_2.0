@@ -2,10 +2,9 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Numerics;
 
 using MathNet.Numerics;
-//using MathNet.Numerics.LinearAlgebra;
-//using MathNet.Numerics.LinearAlgebra.Double;
 using MathNet.Numerics.Interpolation;
 //using MathNet.Numerics.Integration;
 using MathNet.Numerics.Random;
@@ -51,6 +50,13 @@ namespace LGTracer
             double nDays = 30.0; // Days to run
             double dt = 60.0 * 5.0; // Time step in seconds
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
+
+            // Point settings
+            double pressureDelta = 10.0e2; // Layer pressure thickness in Pa. This helps to determine how many points to seed
+            double kgPerPoint = 6.0e10; // Air mass represented by a single point (mass flows are huge - but 1e9 seems very high?)
+
+
+            // CODE STARTS HERE
 
             // Read in MERRA-2 data and use that to set domain
             (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
@@ -143,8 +149,7 @@ namespace LGTracer
                 }
             }
 
-
-            // CODE STARTS HERE
+            // Time handling
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
             double tStart = 0.0;
             double tStop = tStart + duration;
@@ -155,17 +160,20 @@ namespace LGTracer
             // Central RNG for random point seeding
             System.Random RNG = SystemRandomSource.Default;
 
-            // The point manager holds all the actual point data and controls velocity calculations
-            //static void vCalc(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed);
-            //PointManager pointManager = new PointManager(nInitial,nPoints,vCalc);
-            PointManager pointManager = new PointManager(nPoints,(double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed));
+            // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
+            Func<double, double, (double, double)> vCalc = (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed,false);
+            PointManager pointManager = new PointManager(nPoints,vCalc);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial) = MapRandomToXY(xLims[0],xLims[1],yLims[0],yLims[1],nInitial,RNG);
             pointManager.CreatePointSet(xInitial,yInitial);
 
             // Define boundary edges, normals etc
-            //( xyPosts, Vector<double>[] boundaryNormals) = createBoundary(xMesh,yMesh);
+            ( Vector2[] xyPosts, Vector2[] boundaryNormals) = createBoundary(xMesh,yMesh);
+
+            // Estimate the boundary velocity, given the velocity array (now in m/s)
+            Func<double, double, (double, double)> vCalcMPS = (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed,true);
+            Vector2[] vBoundary = GetBoundaryVelocities(xyPosts, vCalcMPS);
 
             // Set up output
             // Add a 2D variable
@@ -208,7 +216,10 @@ namespace LGTracer
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
-                (double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
+                //(double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
+                (double[] xSet, double[] ySet) = SeedBoundary(kgPerPoint, boundaryLengths, pressureDelta, dt,
+                    xyPosts, boundaryNormals, vBoundary, RNG);
+
                 pointManager.CreatePointSet(xSet, ySet);
 
                 // Do the actual work
@@ -323,30 +334,29 @@ namespace LGTracer
             return (xSpeed, ySpeed);
         }
         
-        private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, double[,] xSpeedArray, double[,] ySpeedArray)
+        private static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double xMax, double dx, double yMin, double yMax, double dy, double[,] xSpeedArray, double[,] ySpeedArray, bool noConvert=false)
         {
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
+            int nX = xSpeedArray.GetLength(1);
+            int nY = xSpeedArray.GetLength(0);
             double dxdt, dydt;
-            if ((x >= xMax) || (y >= yMax))
-            {
-                // Propel point out of the domain
-                dxdt = 1.0;
-                dydt = 1.0;
-                return (dxdt, dydt);
-            }
-            if ((x <= xMin) || (y <= yMin))
-            {
-                dxdt = -1.0;
-                dydt = -1.0;
-                return (dxdt, dydt);
-            }
+
             // If we made it this far - we are within the domain
-            int xIndex = (int)Math.Floor((x - xMin)/dx);
-            int yIndex = (int)Math.Floor((y - yMin)/dy);
+            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - xMin)/dx)),nX-1);
+            int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - yMin)/dy)),nY-1);
+
+            // Values in m/s
+            dxdt = xSpeedArray[yIndex,xIndex];
+            dydt = ySpeedArray[yIndex,xIndex];
+            if (noConvert)
+            {
+                return (dxdt,dydt);
+            }
+
             // Convert from m/s to deg/s
-            dxdt = LGConstants.Rad2Deg * xSpeedArray[yIndex,xIndex] / (LGConstants.EarthRadius * Math.Cos(LGConstants.Deg2Rad*y));
-            dydt = LGConstants.Rad2Deg * ySpeedArray[yIndex,xIndex] / LGConstants.EarthRadius;
+            dxdt = LGConstants.Rad2Deg * dxdt / (LGConstants.EarthRadius * Math.Cos(LGConstants.Deg2Rad*y));
+            dydt = LGConstants.Rad2Deg * dydt / LGConstants.EarthRadius;
             return (dxdt, dydt);
         }
 
@@ -397,69 +407,147 @@ namespace LGTracer
             return (xVals, yVals);
         }
 
-        /*
-        private static (Vector2[], Vector2[]) createBoundary( double[] xMesh, double[] yMesh)
+        private static (Vector2[], Vector2[]) createBoundary( double[] xMeshDouble, double[] yMeshDouble)
         {
             // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
+
             // Number of individual edge cells + 1
-            int xPosts = xMesh.Length;
-            int yPosts = yMesh.Length;
-            int nPosts = ((xPosts - 1) * 2) + ((yPosts - 1) * 2) + 1;
-            Vector<double>[] xyPosts = new Vector<double>[nPosts];
-            double[] xy = new double[2];
-            // Define the first post
-            xy = [xMesh[0],yMesh[0]];
-            xyPosts[0] = Vector<double>.Build.DenseOfArray(xy);
-            int currPost = 1;
-            // South boundary
-            for (int i=1; i<xPosts; i++)
+            int xPosts = xMeshDouble.Length;
+            int yPosts = yMeshDouble.Length;
+
+            // Vector2 is float only - do some conversions
+            float[] xMesh = new float[xPosts];
+            float[] yMesh = new float[yPosts];
+            for (int i=0; i<xPosts; i++)
             {
-                xy = [xMesh[i],yMesh[0]];
-                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                xMesh[i] = (float)xMeshDouble[i];
+            }
+            for (int i=0; i<yPosts; i++)
+            {
+                yMesh[i] = (float)yMeshDouble[i];
+            }
+
+            // Duplicate first post for convenience
+            int nPosts = xPosts + (yPosts-1) + (xPosts-1) + (yPosts-1);
+            Vector2[] xyPosts = new Vector2[nPosts];
+            int currPost = 0;
+            // South boundary
+            for (int i=0; i<xPosts; i++)
+            {
+                xyPosts[currPost] = new Vector2(xMesh[i],yMesh[0]);
                 currPost++;
             }
             // East boundary
             for (int i=1; i<yPosts; i++)
             {
-                xy = [xMesh[xPosts-1],yMesh[i]];
-                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                xyPosts[currPost] = new Vector2(xMesh[xPosts-1],yMesh[i]);
                 currPost++;
             }
             // North boundary
             for (int i=xPosts-2; i>=0; i--)
             {
-                xy = [xMesh[i],yMesh[yPosts-1]];
-                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                xyPosts[currPost] = new Vector2(xMesh[i],yMesh[yPosts-1]);
                 currPost++;
             }
-            // West boundary (assume closure - ie do not include a final post identical to the first)
-            for (int i=yPosts-2; i>=1; i--)
+            // West boundary (assume closure - ie include a final post identical to the first)
+            for (int i=yPosts-2; i>=0; i--)
             {
-                xy = [xMesh[0],yMesh[i]];
-                xyPosts[currPost] = Vector<double>.Build.DenseOfArray(xy);
+                xyPosts[currPost] = new Vector2(xMesh[0],yMesh[i]);
                 currPost++;
             }
-            // Now the boundary normals
+            
+            // Now calculate the boundary normals
+            // First and last posts are duplicates for convenience
+            Vector2[] normals = new Vector2[nPosts - 1];
+            Vector2 boundaryVector2;
+            Vector3 boundaryVector3, vertVector3;
+            // Find the normal of each boundary edge by taking the cross-product of the "up" vector
+            // with that of the boundary - this will always face into the domain
+            vertVector3 = new Vector3(0,0,1);
+            Vector3 normVector3;
+            for (int i=0; i<(nPosts-1); i++)
+            {
+                boundaryVector2 = xyPosts[i+1] - xyPosts[i];
+                boundaryVector3 = new Vector3(boundaryVector2,0);
+                normVector3 = Vector3.Normalize(Vector3.Cross(vertVector3,boundaryVector3));
+                normals[i] = new Vector2(normVector3.X,normVector3.Y);
+            }
 
-            return (xyPosts,xyPosts);
+            return (xyPosts,normals);
         }
-        */
 
-        /*
-        private static (double[], double[]) SeedBoundaryAccurate(int nPoints, double[] boundaryLengths, double pressureDelta, 
-            Vector<double>[] boundaryEdges, Vector<double>[] boundaryNormals, Vector<double>[] vBoundary, System.Random RNG)
+        private static Vector2[] GetBoundaryVelocities(Vector2[] xyPosts, Func<double, double, (double, double)> vCalc)
+        {
+            int nCells = xyPosts.Length - 1;
+            double u, v, x, y;
+            Vector2 xyMid;
+            Vector2[] vBoundary = new Vector2[nCells];
+            for (int i=0; i<nCells; i++)
+            {
+                xyMid = xyPosts[i] + (0.5f * (xyPosts[i+1] - xyPosts[i]));
+                x = (double)xyMid.X;
+                y = (double)xyMid.Y;
+                (u, v) = vCalc(x,y);
+                vBoundary[i] = new Vector2((float)u,(float)v);
+            }
+            return vBoundary;
+        }
+        private static (double[], double[]) SeedBoundary(double kgPerPoint, double[] boundaryLengths, double pressureDelta, double dt,
+            Vector2[] boundaryPosts, Vector2[] boundaryNormals, Vector2[] vBoundary, System.Random RNG)
         {
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
-            double xCurr, yCurr;
+            int nEdges = boundaryPosts.Length - 1; // First post is duplicated as last post
             double smallDelta = 1.0e-5;
             double randomVal;
+            double massFlowRate;
+            double pointSurplus = 0.0;
+            double nPoints;
+            Vector2 pointLocation, boundaryVector;
+            int[] nPointsLocal = new int[nEdges];
+            double vNorm;
 
-            double[] xVals = new double[nPoints];
-            double[] yVals = new double[nPoints];
+            for (int i=0; i<nEdges; i++)
+            {
+                // Mass flow rate across the boundary in kg/s
+                vNorm = (double)Vector2.Dot(vBoundary[i],boundaryNormals[i]);
+                massFlowRate = vNorm * boundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
+                // No need to continue if the flow rate is negative
+                if (massFlowRate <= 0.0)
+                {
+                    nPointsLocal[i] = 0;
+                    continue;
+                }
+                // Add on any leftover mass from the previous cell, and then figure out the number of points to use
+                nPoints = pointSurplus + (massFlowRate*dt/kgPerPoint);
+                nPointsLocal[i] = (int)Math.Floor(nPoints);
+                pointSurplus = nPoints - (double)nPointsLocal[i];
+                //Console.WriteLine($"VNORM {vNorm,6:f2} --> FLOWRATE {massFlowRate/1.0e6,6:f2} --> N {nPointsLocal[i],4:d}");
+            }
+
+            int nPointsTotal = nPointsLocal.Sum();
+            //Console.WriteLine($"Expecting {nPointsTotal} new points");
+            double[] xVals = new double[nPointsTotal];
+            double[] yVals = new double[nPointsTotal];
+            int iPointTotal = 0;
+
+            for (int i=0; i<nEdges; i++)
+            {
+                // Allocate the points randomly along the boundary
+                if (nPointsLocal[i] == 0) {continue;}
+                boundaryVector = boundaryPosts[i+1] - boundaryPosts[i];
+                for (int iPoint=0; iPoint < nPointsLocal[i]; iPoint++ )
+                {
+                    randomVal = RNG.NextDouble();
+                    pointLocation = boundaryPosts[i] + ((float)randomVal * boundaryVector) + ((float)smallDelta * boundaryNormals[i]);
+                    xVals[iPointTotal] = pointLocation.X;
+                    yVals[iPointTotal] = pointLocation.Y;
+                    iPointTotal++;
+                    //Console.WriteLine($"Point {iPointTotal,6:d}: X0Y0 {boundaryPosts[i]}/X1Y1 {boundaryPosts[i+1]}/XY {pointLocation}");
+                }
+            }
             return (xVals, yVals);
         }
-        */
 
         private static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
         {

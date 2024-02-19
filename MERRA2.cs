@@ -116,7 +116,6 @@ namespace LGTracer
                 OpenMode = ResourceOpenMode.ReadOnly
             };
 
-            double[,] u,v;
             int lonFirst = lonSet[0];
             int lonLast  = lonSet[1];
             int latFirst = latSet[0];
@@ -151,10 +150,30 @@ namespace LGTracer
             return (ps, temperature, qv);
         }
 
-        public static double[,,] CalculatePressures(double[,] surfacePressure)
+        public static double[,,] CalculatePressures(double[,] surfacePressure,double[] AP, double[] BP)
         {
             // Calculate pressures at grid cell edges given surface pressures
-            return null;
+            // AP and surfacePressure must be in the same units
+            int nY = surfacePressure.GetLength(0);
+            int nX = surfacePressure.GetLength(1);
+            int nLevels = AP.Length;
+            double[,,] pressureEdges = new double[nLevels,nY,nX];
+            double localPS;
+            for (int i=0; i<nX; i++)
+            {
+                for (int j=0; j<nY; j++)
+                {
+                    // Surface pressure
+                    localPS = surfacePressure[j,i];
+                    pressureEdges[0,j,i] = localPS;
+                    // Hybrid eta calculation
+                    for (int level=1; level<nLevels; level++)
+                    {
+                        pressureEdges[level,j,i] = (localPS * BP[level]) + AP[level];
+                    }
+                }
+            }            
+            return pressureEdges;
         }
     }
 }

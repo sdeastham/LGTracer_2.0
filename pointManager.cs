@@ -6,8 +6,6 @@ using System.Linq;
 using System.Collections.Generic;
 using MathNet.Numerics.Random;
 
-using System.Numerics;
-
 namespace LGTracer
 {
     public class PointManager
@@ -101,8 +99,8 @@ namespace LGTracer
                 return AddPoint(x,y);
             }
             // No more points to return!
-            if (Debug) {Console.WriteLine("!!!");}
-            return null;
+            //if (Debug) {Console.WriteLine("!!!");}
+            throw new InvalidOperationException("Point maximum exceeded");
         }
 
         public void DeactivatePoint( int index )
