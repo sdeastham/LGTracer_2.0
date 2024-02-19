@@ -1,15 +1,15 @@
-//using System.Numerics;
-using MathNet.Numerics;
-using MathNet.Numerics.LinearAlgebra;
+using System.Numerics;
+//using MathNet.Numerics;
+//using MathNet.Numerics.LinearAlgebra;
 
 namespace LGTracer
 {
     public class LGPoint
     {
-        protected double[] _location
+        protected Vector2 _location
         { get; set; }
 
-        public double[] InitialLocation
+        public Vector2 InitialLocation
         { get; protected set; }
 
         public Func<double, double, (double, double)> VelocityCalc
@@ -24,23 +24,21 @@ namespace LGTracer
         // Convenience properties
         public double X
         { 
-            get => _location[0];
-            set => _location[0] = value;
+            get => _location.X;
+            set => _location = new Vector2((float)value,_location.Y);
         }
         public double Y
         { 
-            get => _location[1];
-            set => _location[1] = value;
+            get => _location.Y;
+            set => _location = new Vector2(_location.X,(float)value);
         }
 
         public LGPoint( Func<double, double, (double, double)> vCalc )
         {
-            this._location = new double[2];
-            this.InitialLocation = new double[2];
-            this.VelocityCalc = vCalc;
             // Point starts inactive
-            this.X = double.NaN;
-            this.Y = double.NaN;
+            this._location = new Vector2(float.NaN,float.NaN);
+            this.InitialLocation = new Vector2(float.NaN,float.NaN);
+            this.VelocityCalc = vCalc;
             this.UID = 0; // Reserved for inactive points
             this.Active = false;
         }
@@ -49,11 +47,9 @@ namespace LGTracer
         {
             // Change the particle from being inactive to active
             this.Active = true;
-            this.X = x;
-            this.Y = y;
+            this._location = new Vector2((float)x, (float)y);
             // Copy this data for later comparison
-            this.InitialLocation[0] = x;
-            this.InitialLocation[1] = y;
+            this.InitialLocation = new Vector2((float)x, (float)y);
             this.UID = uniqueID;
         }
 
