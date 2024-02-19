@@ -159,6 +159,9 @@ namespace LGTracer
 
             // Central RNG for random point seeding
             System.Random RNG = SystemRandomSource.Default;
+            // Use this if debugging
+            //int seed = 31567891;
+            //System.Random RNG = new SystemRandomSource(seed);
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
             Func<double, double, (double, double)> vCalc = (double x, double y) => VelocityFromFixedSpaceArray(x,y,xMin,xMax,dx,yMin,yMax,dy,xSpeed,ySpeed,false);

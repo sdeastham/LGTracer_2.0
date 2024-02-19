@@ -4,7 +4,6 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using MathNet.Numerics.Random;
 
 namespace LGTracer
 {
