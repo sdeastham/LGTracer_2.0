@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 using System.Numerics;
 
@@ -135,6 +136,7 @@ namespace LGTracer
                 BoundaryLengths[(NX*2) + NY + i] = edgeLength;
             }
 
+            // Set up BoundaryNormals and BoundaryPosts
             CreateBoundary();
         }
 
@@ -210,7 +212,8 @@ namespace LGTracer
             return (xVals, yVals);
         }
 
-        public void CreateBoundary()
+        [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals))]
+        private void CreateBoundary()
         {
             // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
             // Vector2 is float only - do some conversions
@@ -299,7 +302,6 @@ namespace LGTracer
             int nEdges = BoundaryPosts.Length - 1; // First post is duplicated as last post
             double smallDelta = 1.0e-5;
             double massFlux, cellFrac, randomVal;
-            double pointSurplus = 0.0;
             double nPoints;
             Vector2 pointLocation, boundaryVector;
             double vNorm;
@@ -382,20 +384,6 @@ namespace LGTracer
                 yInitial[i] = rng.NextDouble()*ySpan + yStart;
             }
             return (xInitial, yInitial);
-        }
-
-        public void Cull(PointManager pointManager)
-        {
-            // Deactivate any points which are outside the domain
-            // Could also do this with LINQ
-            for (int i=pointManager.NActive-1; i>=0; i--)
-            {
-                LGPoint point = pointManager.ActivePoints[i];
-                if (point.X < XLims[0] || point.X >= XLims[1] || point.Y < YLims[0] || point.Y >= YLims[1] )
-                {
-                    pointManager.DeactivatePoint(i);
-                }
-            }
         }
     }
 }

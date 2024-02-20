@@ -95,7 +95,7 @@ namespace LGTracer
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
             Func<double, double, (double, double)> vCalc = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,xSpeed,ySpeed,false);
-            PointManager pointManager = new PointManager(nPoints,vCalc);
+            PointManager pointManager = new PointManager(nPoints,domainManager,vCalc);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial) = domainManager.MapRandomToXY(nInitial,RNG);
@@ -162,7 +162,7 @@ namespace LGTracer
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
                 pointManager.Advance(dt);
 
-                domainManager.Cull(pointManager);
+                pointManager.Cull();
 
                 nSteps++;
                 tCurr = (iter+1) * dt;

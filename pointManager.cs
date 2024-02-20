@@ -40,10 +40,13 @@ namespace LGTracer
         public Func<double, double, (double, double)> VelocityCalc
         { get; protected set; }
 
+        public DomainManager Domain
+        { get; protected set; }
+
         private bool Debug
         { get; set; }
 
-        public PointManager( int maxPoints, Func<double, double, (double, double)> vCalc, bool debug=false )
+        public PointManager( int maxPoints, DomainManager domain, Func<double, double, (double, double)> vCalc, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
@@ -56,6 +59,9 @@ namespace LGTracer
 
             ActivePoints = [];
             InactivePoints = [];
+
+            // Domain manager to use for culling etc
+            Domain = domain;
 
             // Run in debug mode?
             Debug = debug;
@@ -138,6 +144,20 @@ namespace LGTracer
             {
                 //Console.WriteLine($"{point.UID,5:d}: {point.X,7:f2}/{point.Y,7:f2}");
                 point.Advance(dt);
+            }
+        }
+
+        public void Cull()
+        {
+            // Deactivate any points which are outside the domain
+            // Could also do this with LINQ
+            for (int i=NActive-1; i>=0; i--)
+            {
+                LGPoint point = ActivePoints[i];
+                if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax )
+                {
+                    DeactivatePoint(i);
+                }
             }
         }
 
