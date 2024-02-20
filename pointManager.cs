@@ -147,8 +147,11 @@ namespace LGTracer
                 //if (Debug) {Console.WriteLine("!!!");}
                 throw new InvalidOperationException("Point maximum exceeded");
             }
-            // Set point properties based on local values
-            
+            // Set point properties based on local values#
+            double temperature = Domain.NearestNeighbor(x,y,Domain.TemperatureGridded);
+            double specificHumidity = Domain.NearestNeighbor(x,y,Domain.SpecificHumidityGridded);
+            point.SetTemperature(temperature);
+            point.SetSpecificHumidity(specificHumidity);
 
             return point;
         }
