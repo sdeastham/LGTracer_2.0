@@ -43,6 +43,27 @@ namespace LGTracer
         public DomainManager Domain
         { get; protected set; }
 
+        private List<double[]> XHistory
+        { get; set; }
+
+        private List<double[]> YHistory
+        { get; set; }
+
+        private List<double[]> TemperatureHistory
+        { get; set; }
+
+        private List<double[]> SpecificHumidityHistory
+        { get; set; }
+
+        private List<uint[]> UIDHistory
+        { get; set; }
+
+        private List<double> TimeHistory
+        { get; set; }
+
+        public int MaxStoredPoints
+        { get; private set; }
+
         private bool Debug
         { get; set; }
 
@@ -57,8 +78,20 @@ namespace LGTracer
             // Limit on how many points can be managed
             MaxPoints = maxPoints;
 
+            // Max number of points stored out in any single sample (diagnostic only)
+            MaxStoredPoints = 0;
+
             ActivePoints = [];
             InactivePoints = [];
+
+            // For output
+            TimeHistory = [];
+            XHistory = [];
+            YHistory = [];
+            UIDHistory = [];
+
+            TemperatureHistory = [];
+            SpecificHumidityHistory = [];
 
             // Domain manager to use for culling etc
             Domain = domain;
@@ -161,8 +194,7 @@ namespace LGTracer
             }
         }
 
-        public bool WriteToFile(string fileName, List<double> time, List<double[]> xHistory, List<double[]> yHistory, 
-            List<double[]> temperatureHistory, List<double[]> specificHumidityHistory, List<uint[]> UIDHistory, int maxActive)
+        public bool WriteToFile(string fileName)
         {
             bool success = true;
 
@@ -174,8 +206,8 @@ namespace LGTracer
             };
 
             // Get the output sizes
-            int nPoints = Math.Min(maxActive,xHistory[0].Length);
-            int nTimes = time.Count;
+            int nPoints = Math.Min(MaxStoredPoints,XHistory[0].Length);
+            int nTimes = TimeHistory.Count;
 
             int[] index = new int[nPoints];
             for (int i=0; i<nPoints; i++ )
@@ -194,10 +226,10 @@ namespace LGTracer
             {
                 for (int j=0; j<nPoints; j++)
                 {
-                    x2D[i,j] = xHistory[i][j];
-                    y2D[i,j] = yHistory[i][j];
-                    temperature2D[i,j] = temperatureHistory[i][j];
-                    specificHumidity2D[i,j] = specificHumidityHistory[i][j];
+                    x2D[i,j] = XHistory[i][j];
+                    y2D[i,j] = YHistory[i][j];
+                    temperature2D[i,j] = TemperatureHistory[i][j];
+                    specificHumidity2D[i,j] = SpecificHumidityHistory[i][j];
                     UIDs[i,j] = UIDHistory[i][j];
                 }
             }
@@ -205,7 +237,7 @@ namespace LGTracer
             using (DataSet ds = DataSet.Open(dsUri))
             {
                 ds.AddAxis("index","-",index);
-                ds.AddAxis("time","seconds",time.ToArray());
+                ds.AddAxis("time","seconds",TimeHistory.ToArray());
                 ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "temperature", temperature2D, ["time","index"]);
@@ -217,10 +249,10 @@ namespace LGTracer
             return success;
         }
 
-        public int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, 
-            List<double[]> temperatureHistory, List<double[]> specificHumidityHistory, List<uint[]> UIDHistory, double tCurr)
+        public void ArchiveConditions(double tCurr)
         {
-            int nPoints = this.MaxPoints;
+            MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
+            int nPoints = MaxStoredPoints;
             double[] xPoints                = new double[nPoints];
             double[] yPoints                = new double[nPoints];
             double[] temperaturePoints      = new double[nPoints];
@@ -228,9 +260,9 @@ namespace LGTracer
             uint[] UIDs = new uint[nPoints];
             for (int i=0; i<nPoints; i++)
             {
-                if (i<this.NActive)
+                if (i<NActive)
                 {
-                    LGPoint point = this.ActivePoints[i];
+                    LGPoint point = ActivePoints[i];
                     xPoints[i] = point.X;
                     yPoints[i] = point.Y;
                     temperaturePoints[i] = point.Temperature;
@@ -246,13 +278,12 @@ namespace LGTracer
                     UIDs[i] = 0;
                 }
             }
-            time.Add(tCurr);
-            xHistory.Add(xPoints);
-            yHistory.Add(yPoints);
-            temperatureHistory.Add(temperaturePoints);
-            specificHumidityHistory.Add(specificHumidityPoints);
+            TimeHistory.Add(tCurr);
+            XHistory.Add(xPoints);
+            YHistory.Add(yPoints);
+            TemperatureHistory.Add(temperaturePoints);
+            SpecificHumidityHistory.Add(specificHumidityPoints);
             UIDHistory.Add(UIDs);
-            return this.NActive;
         }
     }
 }

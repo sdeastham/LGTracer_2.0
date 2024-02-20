@@ -112,20 +112,8 @@ namespace LGTracer
             Vector2[] vBoundary = domainManager.GetBoundaryVelocities(vCalcMPS);
 
             // Set up output
-            // Add a 2D variable
-            // Define dimensions (variables)
-            List<double> time = [];
-
-            // X of all points will be stored as a 2D array
-            List<double[]> xHistory = [];
-            List<double[]> yHistory = [];
-            List<double[]> temperatureHistory = [];
-            List<double[]> specificHumidityHistory = [];
-            List<uint[]> UIDHistory = [];
-
-            // Store initial conditions - keeping track of the largest number of points being
-            // tracked at any given output time
-            int maxActive = pointManager.ArchiveConditions(time,xHistory,yHistory,temperatureHistory,specificHumidityHistory,UIDHistory,tCurr);
+            // Store initial conditions
+            pointManager.ArchiveConditions(tCurr);
             tStorage += dtStorage;
             int nStored = 1;
 
@@ -174,7 +162,7 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    maxActive = Math.Max(maxActive,pointManager.ArchiveConditions(time,xHistory,yHistory,temperatureHistory,specificHumidityHistory,UIDHistory,tCurr));
+                    pointManager.ArchiveConditions(tCurr);
                     tStorage += dtStorage;
                     nStored += 1;
                 }
@@ -185,10 +173,10 @@ namespace LGTracer
             double msPerStep = elapsedTime/nSteps;
             Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
-            bool success = pointManager.WriteToFile(outputFileName,time,xHistory,yHistory,temperatureHistory,specificHumidityHistory,UIDHistory,maxActive);
+            bool success = pointManager.WriteToFile(outputFileName);
             if (success)
             {
-                Console.WriteLine($"Output data with {nStored} samples [max points stored: {maxActive}] successfully written to {outputFileName}");
+                Console.WriteLine($"Output data with {nStored} samples [max points stored: {pointManager.MaxStoredPoints}] successfully written to {outputFileName}");
             }
             else
             {
