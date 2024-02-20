@@ -61,6 +61,18 @@ namespace LGTracer
         public Vector2[] BoundaryPosts
         { get; protected set; }
 
+        public double[,] XSpeedGridded
+        { get; protected set; }
+
+        public double[,] YSpeedGridded
+        { get; protected set; }
+
+        public double[,] TemperatureGridded
+        { get; protected set; }
+
+        public double[,] SpecificHumidityGridded
+        { get; protected set; }
+
         public DomainManager(double[] lonEdge, double[] latEdge)
         {
             // Set up the mesh (units of degrees)
@@ -138,15 +150,35 @@ namespace LGTracer
 
             // Set up BoundaryNormals and BoundaryPosts
             CreateBoundary();
+
+            // Set up the meteorological data
+            XSpeedGridded = new double[NY,NX];
+            YSpeedGridded = new double[NY,NX];
+            TemperatureGridded = new double[NY,NX];
+            SpecificHumidityGridded = new double[NY,NX];
         }
 
-        public (double, double) VelocityFromFixedSpaceArray( double x, double y, double[,] xSpeedArray, double[,] ySpeedArray, bool noConvert=false)
+        public void UpdateMeteorology( double[,] xSpeed, double[,] ySpeed, double[,] temperature, double[,] specificHumidity )
+        {
+            for (int i=0; i<NX; i++)
+            {
+                for (int j=0; j<NY; j++)
+                {
+                    XSpeedGridded[j,i] = xSpeed[j,i];
+                    YSpeedGridded[j,i] = ySpeed[j,i];
+                    TemperatureGridded[j,i] = temperature[j,i];
+                    SpecificHumidityGridded[j,i] = specificHumidity[j,i];
+                }
+            }
+        }
+
+        public (double, double) VelocityFromFixedSpaceArray( double x, double y, bool noConvert=false)
         {
             // Extract the velocity vector from an array
             // Values in m/s
             // Inefficient as we repeat the neighbor calculation
-            double dxdt = NearestNeighbor(x,y,xSpeedArray);
-            double dydt = NearestNeighbor(x,y,ySpeedArray);
+            double dxdt = NearestNeighbor(x,y,XSpeedGridded);
+            double dydt = NearestNeighbor(x,y,YSpeedGridded);
             if (noConvert)
             {
                 return (dxdt,dydt);
@@ -277,7 +309,7 @@ namespace LGTracer
             }
         }
 
-        public Vector2[] GetBoundaryVelocities(Func<double, double, (double, double)> vCalc)
+        public Vector2[] GetBoundaryVelocities()
         {
             int nCells = BoundaryPosts.Length - 1;
             double u, v, x, y;
@@ -288,14 +320,14 @@ namespace LGTracer
                 xyMid = BoundaryPosts[i] + (0.5f * (BoundaryPosts[i+1] - BoundaryPosts[i]));
                 x = (double)xyMid.X;
                 y = (double)xyMid.Y;
-                (u, v) = vCalc(x,y);
+                (u, v) = VelocityFromFixedSpaceArray(x,y,true);
                 vBoundary[i] = new Vector2((float)u,(float)v);
             }
             return vBoundary;
         }
 
         public (double[], double[], double) SeedBoundary(double kgPerPoint, double pressureDelta, double dt,
-            Vector2[] vBoundary, System.Random RNG, double massSurplus = 0.0)
+            System.Random RNG, double massSurplus = 0.0)
         {
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
@@ -307,6 +339,9 @@ namespace LGTracer
             double vNorm;
             double[] massFluxes = new double[nEdges];
             double[] weighting;
+
+            //Func<double, double, (double, double)> vCalcMPS = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,true);
+            Vector2[] vBoundary = GetBoundaryVelocities();
 
             for (int i=0; i<nEdges; i++)
             {

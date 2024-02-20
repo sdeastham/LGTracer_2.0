@@ -67,12 +67,13 @@ namespace LGTracer
         private bool Debug
         { get; set; }
 
-        public PointManager( int maxPoints, DomainManager domain, Func<double, double, (double, double)> vCalc, bool debug=false )
+        public PointManager( int maxPoints, DomainManager domain, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
 
             // Set the velocity calculation
+            Func<double, double, (double, double)> vCalc = (double x, double y) => domain.VelocityFromFixedSpaceArray(x,y,false);
             VelocityCalc = vCalc;
 
             // Limit on how many points can be managed

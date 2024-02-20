@@ -57,6 +57,10 @@ namespace LGTracer
             // Set up the domain
             DomainManager domainManager = new DomainManager(lonEdge, latEdge);
 
+            // Estimate the boundary velocity, given the velocity array (now in m/s)
+            //Func<double, double, (double, double)> vCalcMPS = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,true);
+            //Vector2[] vBoundary = domainManager.GetBoundaryVelocities(vCalcMPS);
+
             int xCells     = domainManager.NX;
             int yCells     = domainManager.NY;
             double xMin    = domainManager.XMin;
@@ -66,18 +70,8 @@ namespace LGTracer
             double[] xLims = domainManager.XLims;
             double[] yLims = domainManager.YLims;
 
-            // Create the velocity array in m/s
-            double[,] xSpeed = new double[yCells,xCells];
-            double[,] ySpeed = new double[yCells,xCells];
-            for (int i=0;i<xCells;i++)
-            {
-                for (int j=0;j<yCells;j++)
-                {
-                    //(xSpeed[j,i], ySpeed[j,i]) = VelocitySolidBody(xMid[i],yMid[j],omega);
-                    xSpeed[j,i] = uWind[j,i];// * roughWindConversion;
-                    ySpeed[j,i] = vWind[j,i];// * roughWindConversion;
-                }
-            }
+            // Set up the domain meteorology
+            domainManager.UpdateMeteorology(uWind,vWind,griddedTemperature,griddedSpecificHumidity);
 
             // Time handling
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
@@ -94,22 +88,20 @@ namespace LGTracer
             //System.Random RNG = new SystemRandomSource(seed);
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            Func<double, double, (double, double)> vCalc = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,xSpeed,ySpeed,false);
-            PointManager pointManager = new PointManager(nPoints,domainManager,vCalc);
+            //Func<double, double, (double, double)> vCalc = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,false);
+            PointManager pointManager = new PointManager(nPoints,domainManager);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial) = domainManager.MapRandomToXY(nInitial,RNG);
             pointManager.CreatePointSet(xInitial,yInitial);
 
+            /*
             foreach (LGPoint point in pointManager.ActivePoints)
             {
                 point.SetTemperature(domainManager.NearestNeighbor(point.X,point.Y,griddedTemperature));
                 point.SetSpecificHumidity(domainManager.NearestNeighbor(point.X,point.Y,griddedSpecificHumidity));
             }
-
-            // Estimate the boundary velocity, given the velocity array (now in m/s)
-            Func<double, double, (double, double)> vCalcMPS = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,xSpeed,ySpeed,true);
-            Vector2[] vBoundary = domainManager.GetBoundaryVelocities(vCalcMPS);
+            */
 
             // Set up output
             // Store initial conditions
@@ -144,7 +136,7 @@ namespace LGTracer
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
                 //(double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
-                (double[] xSet, double[] ySet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, pressureDelta, dt, vBoundary, RNG, massSurplus);
+                (double[] xSet, double[] ySet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, pressureDelta, dt, RNG, massSurplus);
 
                 pointManager.CreatePointSet(xSet, ySet);
 
