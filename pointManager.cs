@@ -161,7 +161,8 @@ namespace LGTracer
             }
         }
 
-        public bool WriteToFile(string fileName, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, int maxActive)
+        public bool WriteToFile(string fileName, List<double> time, List<double[]> xHistory, List<double[]> yHistory, 
+            List<double[]> temperatureHistory, List<double[]> specificHumidityHistory, List<uint[]> UIDHistory, int maxActive)
         {
             bool success = true;
 
@@ -185,6 +186,8 @@ namespace LGTracer
             // Convert the lists into conventional 2D arrays
             double[,] x2D = new double[nTimes, nPoints];
             double[,] y2D = new double[nTimes, nPoints];
+            double[,] temperature2D = new double[nTimes, nPoints];
+            double[,] specificHumidity2D = new double[nTimes, nPoints];
             uint[,] UIDs = new uint[nTimes, nPoints];
 
             for (int i=0; i<nTimes; i++)
@@ -193,6 +196,8 @@ namespace LGTracer
                 {
                     x2D[i,j] = xHistory[i][j];
                     y2D[i,j] = yHistory[i][j];
+                    temperature2D[i,j] = temperatureHistory[i][j];
+                    specificHumidity2D[i,j] = specificHumidityHistory[i][j];
                     UIDs[i,j] = UIDHistory[i][j];
                 }
             }
@@ -203,6 +208,8 @@ namespace LGTracer
                 ds.AddAxis("time","seconds",time.ToArray());
                 ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
+                ds.AddVariable(typeof(double), "temperature", temperature2D, ["time","index"]);
+                ds.AddVariable(typeof(double), "specific_humidity", specificHumidity2D, ["time","index"]);
                 ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
                 ds.Commit();
             }
@@ -210,11 +217,14 @@ namespace LGTracer
             return success;
         }
 
-        public int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr)
+        public int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, 
+            List<double[]> temperatureHistory, List<double[]> specificHumidityHistory, List<uint[]> UIDHistory, double tCurr)
         {
             int nPoints = this.MaxPoints;
-            double[] xPoints = new double[nPoints];
-            double[] yPoints = new double[nPoints];
+            double[] xPoints                = new double[nPoints];
+            double[] yPoints                = new double[nPoints];
+            double[] temperaturePoints      = new double[nPoints];
+            double[] specificHumidityPoints = new double[nPoints];
             uint[] UIDs = new uint[nPoints];
             for (int i=0; i<nPoints; i++)
             {
@@ -223,18 +233,24 @@ namespace LGTracer
                     LGPoint point = this.ActivePoints[i];
                     xPoints[i] = point.X;
                     yPoints[i] = point.Y;
+                    temperaturePoints[i] = point.Temperature;
+                    specificHumidityPoints[i] = point.SpecificHumidity;
                     UIDs[i] = point.UID;
                 }
                 else
                 {
                     xPoints[i] = double.NaN;
                     yPoints[i] = double.NaN;
+                    temperaturePoints[i] = double.NaN;
+                    specificHumidityPoints[i] = double.NaN;
                     UIDs[i] = 0;
                 }
             }
             time.Add(tCurr);
             xHistory.Add(xPoints);
             yHistory.Add(yPoints);
+            temperatureHistory.Add(temperaturePoints);
+            specificHumidityHistory.Add(specificHumidityPoints);
             UIDHistory.Add(UIDs);
             return this.NActive;
         }
