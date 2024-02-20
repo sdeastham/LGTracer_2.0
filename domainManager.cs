@@ -8,21 +8,143 @@ namespace LGTracer
 {
     public class DomainManager
     {
-        public double TestValue
-        { get; set; }
 
-        public DomainManager()
+        public double XMin
+        { get; protected set; }
+        
+        public double YMin
+        { get; protected set; }
+        
+        public double XMax
+        { get; protected set; }
+
+        public double YMax
+        { get; protected set; }
+
+        public int NX
+        { get; protected set; }
+
+        public int NY
+        { get; protected set; }
+
+        public double DX
+        { get; protected set; }
+
+        public double DY
+        { get; protected set; }
+
+        public double[] XLims
+        { get; protected set; }
+
+        public double[] YLims
+        { get; protected set; }
+        
+        public double[] XMesh
+        { get; protected set; }
+        
+        public double[] XMids
+        { get; protected set; }
+
+        public double[] YMesh
+        { get; protected set; }
+
+        public double[] YMids
+        { get; protected set; }
+
+        public double[] BoundaryLengths
+        { get; protected set; }
+
+        public Vector2[] BoundaryNormals
+        { get; protected set; }
+
+        public Vector2[] BoundaryPosts
+        { get; protected set; }
+
+        public DomainManager(double[] lonEdge, double[] latEdge)
         {
-            TestValue = double.NaN;
+            // Set up the mesh (units of degrees)
+            // The original lon/lat limits aren't important - need the mesh limits
+            int xPosts = lonEdge.Length;
+            NX = xPosts - 1;
+            int yPosts = latEdge.Length;
+            NY = yPosts - 1;
+
+            XMin  = lonEdge[0];
+            XMax  =  lonEdge[xPosts-1];
+            double xSpan = XMax - XMin;
+
+            YMin  = latEdge[0];
+            YMax  = latEdge[yPosts-1];
+            double ySpan = YMax - YMin;
+
+            // Assume uniform spacing
+            DX = xSpan/(xPosts - 1);
+            DY = ySpan/(yPosts - 1);
+
+            // For convenience
+            XLims = new double[] {XMin,XMax};
+            YLims = new double[] {YMin,YMax};
+
+            // X edges (degrees)
+            XMesh = new double[xPosts];
+            XMids = new double[NX];
+            for (int i=0;i<xPosts;i++)
+            {
+                XMesh[i] = lonEdge[i];
+                if (i > 0)
+                {
+                    XMids[i-1] = (XMesh[i] + XMesh[i-1])/2.0;
+                }
+            }
+
+            // Y edges (degrees)
+            YMesh = new double[yPosts];
+            YMids  = new double[NY];
+            for (int i=0;i<yPosts;i++)
+            {
+                //yMesh[i] = yMin + (dy * i);
+                YMesh[i] = latEdge[i];
+                if (i > 0)
+                {
+                    YMids[i-1] = (YMesh[i] + YMesh[i-1])/2.0;
+                }
+            }
+
+            // Boundary lengths (m)
+            BoundaryLengths = new double[NX*2 + NY*2];
+            double earthCircumference = 2.0 * Math.PI * LGConstants.EarthRadius;
+            double edgeLength;
+
+            // South boundary
+            edgeLength = (DX/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[0]);
+            for (int i=0;i<NX;i++)
+            {
+                BoundaryLengths[i] = edgeLength;
+            }
+            // North boundary
+            edgeLength = (DX/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[yPosts-1]);
+            for (int i=0;i<NX;i++)
+            {
+                BoundaryLengths[NX + NY + i] = edgeLength;
+            }
+            // All cells on the East and West boundaries have a constant length
+            edgeLength = (DY/360.0) * earthCircumference;
+            for (int i=0;i<NY;i++)
+            {
+                BoundaryLengths[NX + i] = edgeLength;
+                BoundaryLengths[(NX*2) + NY + i] = edgeLength;
+            }
+
+            CreateBoundary();
         }
 
-        public static (double, double) VelocityFromFixedSpaceArray( double x, double y, double xMin, double dx, double yMin, double dy, double[,] xSpeedArray, double[,] ySpeedArray, bool noConvert=false)
+        public (double, double) VelocityFromFixedSpaceArray( double x, double y, double[,] xSpeedArray, double[,] ySpeedArray, bool noConvert=false)
         {
             // Extract the velocity vector from an array
             // Values in m/s
             // Inefficient as we repeat the neighbor calculation
-            double dxdt = NearestNeighbor(x,y,xMin,dx,yMin,dy,xSpeedArray);
-            double dydt = NearestNeighbor(x,y,xMin,dx,yMin,dy,ySpeedArray);
+            double dxdt = NearestNeighbor(x,y,xSpeedArray);
+            double dydt = NearestNeighbor(x,y,ySpeedArray);
             if (noConvert)
             {
                 return (dxdt,dydt);
@@ -34,30 +156,22 @@ namespace LGTracer
             return (dxdt, dydt);
         }
 
-        public static double NearestNeighbor( double x, double y, double xMin, double dx, double yMin, double dy, double[,] valueArray)
+        public double NearestNeighbor( double x, double y, double[,] valueArray)
         {
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
-            int nX = valueArray.GetLength(1);
-            int nY = valueArray.GetLength(0);
-
-            // If we made it this far - we are within the domain
-            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - xMin)/dx)),nX-1);
-            int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - yMin)/dy)),nY-1);
+            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DY)),NX-1);
+            int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - YMin)/DY)),NY-1);
 
             // Values in m/s
             return valueArray[yIndex,xIndex];
         }
 
-        public static (double[], double[]) SeedBoundaryUniform(int nPoints, double[] xLims, double[] yLims, System.Random RNG)
+        public (double[], double[]) SeedBoundaryUniform(int nPoints, System.Random RNG)
         {
             // Seed the domain boundaries completely uniformly
-            double xMin = xLims[0];
-            double xMax = xLims[1];
-            double xSpan = xMax - xMin;
-            double yMin = yLims[0];
-            double yMax = yLims[1];
-            double ySpan = yMax - yMin;
+            double xSpan = XMax - XMin;
+            double ySpan = YMax - YMin;
             double xCurr, yCurr;
             double smallDelta = 1.0e-5;
             double randomVal;
@@ -72,23 +186,23 @@ namespace LGTracer
                 randomVal = RNG.NextDouble() * ((xSpan*2) + (ySpan*2));
                 if (randomVal < xSpan)
                 {
-                    yCurr = yMin + smallDelta;
-                    xCurr = xMin + randomVal;
+                    yCurr = YMin + smallDelta;
+                    xCurr = XMin + randomVal;
                 }
                 else if (randomVal < (xSpan + ySpan))
                 {
-                    yCurr = yMin + (randomVal - xSpan);
-                    xCurr = xMax - smallDelta;
+                    yCurr = YMin + (randomVal - xSpan);
+                    xCurr = XMax - smallDelta;
                 }
                 else if (randomVal < (xSpan + ySpan + xSpan))
                 {
-                    yCurr = yMax - smallDelta;
-                    xCurr = xMin + (randomVal - (xSpan + ySpan));
+                    yCurr = YMax - smallDelta;
+                    xCurr = XMin + (randomVal - (xSpan + ySpan));
                 }
                 else
                 {
-                    yCurr = yMin + (randomVal - (xSpan + ySpan + xSpan));
-                    xCurr = xMin + smallDelta;
+                    yCurr = YMin + (randomVal - (xSpan + ySpan + xSpan));
+                    xCurr = XMin + smallDelta;
                 }
                 xVals[i] = xCurr;
                 yVals[i] = yCurr;
@@ -96,58 +210,55 @@ namespace LGTracer
             return (xVals, yVals);
         }
 
-        public static (Vector2[], Vector2[]) CreateBoundary( double[] xMeshDouble, double[] yMeshDouble)
+        public void CreateBoundary()
         {
             // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
-
-            // Number of individual edge cells + 1
-            int xPosts = xMeshDouble.Length;
-            int yPosts = yMeshDouble.Length;
-
             // Vector2 is float only - do some conversions
-            float[] xMesh = new float[xPosts];
-            float[] yMesh = new float[yPosts];
+            int xPosts = NX + 1;
+            int yPosts = NY + 1;
+            float[] xMeshFloat = new float[xPosts];
+            float[] yMeshFloat = new float[yPosts];
             for (int i=0; i<xPosts; i++)
             {
-                xMesh[i] = (float)xMeshDouble[i];
+                xMeshFloat[i] = (float)XMesh[i];
             }
             for (int i=0; i<yPosts; i++)
             {
-                yMesh[i] = (float)yMeshDouble[i];
+                yMeshFloat[i] = (float)YMesh[i];
             }
 
             // Duplicate first post for convenience
             int nPosts = xPosts + (yPosts-1) + (xPosts-1) + (yPosts-1);
-            Vector2[] xyPosts = new Vector2[nPosts];
+            BoundaryPosts = new Vector2[nPosts];
             int currPost = 0;
             // South boundary
             for (int i=0; i<xPosts; i++)
             {
-                xyPosts[currPost] = new Vector2(xMesh[i],yMesh[0]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[i],yMeshFloat[0]);
                 currPost++;
             }
             // East boundary
             for (int i=1; i<yPosts; i++)
             {
-                xyPosts[currPost] = new Vector2(xMesh[xPosts-1],yMesh[i]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[xPosts-1],yMeshFloat[i]);
                 currPost++;
             }
             // North boundary
             for (int i=xPosts-2; i>=0; i--)
             {
-                xyPosts[currPost] = new Vector2(xMesh[i],yMesh[yPosts-1]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[i],yMeshFloat[yPosts-1]);
                 currPost++;
             }
             // West boundary (assume closure - ie include a final post identical to the first)
             for (int i=yPosts-2; i>=0; i--)
             {
-                xyPosts[currPost] = new Vector2(xMesh[0],yMesh[i]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[0],yMeshFloat[i]);
                 currPost++;
             }
             
             // Now calculate the boundary normals
             // First and last posts are duplicates for convenience
-            Vector2[] normals = new Vector2[nPosts - 1];
+            BoundaryNormals = new Vector2[nPosts - 1];
             Vector2 boundaryVector2;
             Vector3 boundaryVector3, vertVector3;
             // Find the normal of each boundary edge by taking the cross-product of the "up" vector
@@ -156,24 +267,22 @@ namespace LGTracer
             Vector3 normVector3;
             for (int i=0; i<(nPosts-1); i++)
             {
-                boundaryVector2 = xyPosts[i+1] - xyPosts[i];
+                boundaryVector2 = BoundaryPosts[i+1] - BoundaryPosts[i];
                 boundaryVector3 = new Vector3(boundaryVector2,0);
                 normVector3 = Vector3.Normalize(Vector3.Cross(vertVector3,boundaryVector3));
-                normals[i] = new Vector2(normVector3.X,normVector3.Y);
+                BoundaryNormals[i] = new Vector2(normVector3.X,normVector3.Y);
             }
-
-            return (xyPosts,normals);
         }
 
-        public static Vector2[] GetBoundaryVelocities(Vector2[] xyPosts, Func<double, double, (double, double)> vCalc)
+        public Vector2[] GetBoundaryVelocities(Func<double, double, (double, double)> vCalc)
         {
-            int nCells = xyPosts.Length - 1;
+            int nCells = BoundaryPosts.Length - 1;
             double u, v, x, y;
             Vector2 xyMid;
             Vector2[] vBoundary = new Vector2[nCells];
             for (int i=0; i<nCells; i++)
             {
-                xyMid = xyPosts[i] + (0.5f * (xyPosts[i+1] - xyPosts[i]));
+                xyMid = BoundaryPosts[i] + (0.5f * (BoundaryPosts[i+1] - BoundaryPosts[i]));
                 x = (double)xyMid.X;
                 y = (double)xyMid.Y;
                 (u, v) = vCalc(x,y);
@@ -181,12 +290,13 @@ namespace LGTracer
             }
             return vBoundary;
         }
-        public static (double[], double[], double) SeedBoundary(double kgPerPoint, double[] boundaryLengths, double pressureDelta, double dt,
-            Vector2[] boundaryPosts, Vector2[] boundaryNormals, Vector2[] vBoundary, System.Random RNG, double massSurplus = 0.0)
+
+        public (double[], double[], double) SeedBoundary(double kgPerPoint, double pressureDelta, double dt,
+            Vector2[] vBoundary, System.Random RNG, double massSurplus = 0.0)
         {
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
-            int nEdges = boundaryPosts.Length - 1; // First post is duplicated as last post
+            int nEdges = BoundaryPosts.Length - 1; // First post is duplicated as last post
             double smallDelta = 1.0e-5;
             double massFlux, cellFrac, randomVal;
             double pointSurplus = 0.0;
@@ -199,8 +309,9 @@ namespace LGTracer
             for (int i=0; i<nEdges; i++)
             {
                 // Mass flow rate across the boundary in kg/s
-                vNorm = (double)Vector2.Dot(vBoundary[i],boundaryNormals[i]);
-                massFlux = dt * vNorm * boundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
+                vNorm = (double)Vector2.Dot(vBoundary[i],BoundaryNormals[i]);
+                //Console.WriteLine($"{i} -> {BoundaryLengths[i]}");
+                massFlux = dt * vNorm * BoundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
                 massFluxes[i] = Math.Max(0.0,massFlux);
             }
 
@@ -238,7 +349,7 @@ namespace LGTracer
                 {
                     iCell++;
                 }
-                boundaryVector = boundaryPosts[iCell+1] - boundaryPosts[iCell];
+                boundaryVector = BoundaryPosts[iCell+1] - BoundaryPosts[iCell];
                 // Remainder of randomVal used to figure out how far along the cell we go
                 if (iCell > 0)
                 {
@@ -248,20 +359,20 @@ namespace LGTracer
                 { 
                     cellFrac = randomVal/weighting[0];
                 }
-                pointLocation = boundaryPosts[iCell] + ((float)cellFrac * boundaryVector) + ((float)smallDelta * boundaryNormals[iCell]);
+                pointLocation = BoundaryPosts[iCell] + ((float)cellFrac * boundaryVector) + ((float)smallDelta * BoundaryNormals[iCell]);
                 xVals[iPoint] = pointLocation.X;
                 yVals[iPoint] = pointLocation.Y;
             }
             return (xVals, yVals, massSurplus);
         }
 
-        public static (double[], double[]) MapRandomToXY( double xMin, double xMax, double yMin, double yMax, int nPoints, System.Random rng )
+        public (double[], double[]) MapRandomToXY( int nPoints, System.Random rng )
         {
             // Scatter randomly throughout domain
-            double xSpan = xMax - xMin;
-            double xStart = xMin;
-            double ySpan = yMax - yMin;
-            double yStart = yMin;
+            double xSpan = XMax - XMin;
+            double xStart = XMin;
+            double ySpan = YMax - YMin;
+            double yStart = YMin;
 
             double[] xInitial = new double[nPoints];
             double[] yInitial = new double[nPoints];
@@ -273,14 +384,14 @@ namespace LGTracer
             return (xInitial, yInitial);
         }
 
-        public static void Cull(double[] xLims, double[] yLims, PointManager pointManager)
+        public void Cull(PointManager pointManager)
         {
             // Deactivate any points which are outside the domain
             // Could also do this with LINQ
             for (int i=pointManager.NActive-1; i>=0; i--)
             {
                 LGPoint point = pointManager.ActivePoints[i];
-                if (point.X < xLims[0] || point.X >= xLims[1] || point.Y < yLims[0] || point.Y >= yLims[1] )
+                if (point.X < XLims[0] || point.X >= XLims[1] || point.Y < YLims[0] || point.Y >= YLims[1] )
                 {
                     pointManager.DeactivatePoint(i);
                 }

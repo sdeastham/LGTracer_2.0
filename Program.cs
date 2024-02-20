@@ -54,76 +54,17 @@ namespace LGTracer
             // Also read in PS, T, and QV
             (double[,] surfacePressure, double[,]griddedTemperature, double[,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, readLevel, lonSet, latSet );
 
-            // Set up the mesh (units of degrees)
-            // The original lon/lat limits aren't important - need the mesh limits
-            int xPosts = lonEdge.Length;
-            int xCells = xPosts - 1;
-            int yPosts = latEdge.Length;
-            int yCells = yPosts - 1;
+            // Set up the domain
+            DomainManager domainManager = new DomainManager(lonEdge, latEdge);
 
-            double xMin  = lonEdge[0];
-            double xMax  =  lonEdge[xPosts-1];
-            double xSpan = xMax - xMin;
-            double yMin  = latEdge[0];
-            double yMax  = latEdge[yPosts-1];
-            double ySpan = yMax - yMin;
-            // Assume uniform spacing
-            double dx = xSpan/(xPosts - 1);
-            double dy = ySpan/(yPosts - 1);
-
-            // For convenience
-            double[] xLims = {xMin,xMax};
-            double[] yLims = {yMin,yMax};
-
-            // X edges (degrees)
-            double[] xMesh = new double[xPosts];
-            double[] xMid = new double[xCells];
-            for (int i=0;i<xPosts;i++)
-            {
-                xMesh[i] = lonEdge[i];
-                if (i > 0)
-                {
-                    xMid[i-1] = (xMesh[i] + xMesh[i-1])/2.0;
-                }
-            }
-
-            // Y edges (degrees)
-            double[] yMesh = new double[yPosts];
-            double[] yMid  = new double[yCells];
-            for (int i=0;i<yPosts;i++)
-            {
-                //yMesh[i] = yMin + (dy * i);
-                yMesh[i] = latEdge[i];
-                if (i > 0)
-                {
-                    yMid[i-1] = (yMesh[i] + yMesh[i-1])/2.0;
-                }
-            }
-
-            // Boundary lengths (m)
-            double[] boundaryLengths = new double[xCells*2 + yCells*2];
-            double earthCircumference = 2.0 * Math.PI * LGConstants.EarthRadius;
-            double edgeLength;
-
-            // South boundary
-            edgeLength = (dx/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[0]);
-            for (int i=0;i<xCells;i++)
-            {
-                boundaryLengths[i] = edgeLength;
-            }
-            // North boundary
-            edgeLength = (dx/360.0) * earthCircumference * Math.Cos(LGConstants.Deg2Rad*latEdge[yPosts-1]);
-            for (int i=0;i<xCells;i++)
-            {
-                boundaryLengths[xCells + yCells + i] = edgeLength;
-            }
-            // All cells on the East and West boundaries have a constant length
-            edgeLength = (dy/360.0) * earthCircumference;
-            for (int i=0;i<yCells;i++)
-            {
-                boundaryLengths[xCells + i] = edgeLength;
-                boundaryLengths[(xCells*2) + yCells + i] = edgeLength;
-            }
+            int xCells     = domainManager.NX;
+            int yCells     = domainManager.NY;
+            double xMin    = domainManager.XMin;
+            double dx      = domainManager.DX;
+            double yMin    = domainManager.YMin;
+            double dy      = domainManager.DY;
+            double[] xLims = domainManager.XLims;
+            double[] yLims = domainManager.YLims;
 
             // Create the velocity array in m/s
             double[,] xSpeed = new double[yCells,xCells];
@@ -153,25 +94,22 @@ namespace LGTracer
             //System.Random RNG = new SystemRandomSource(seed);
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            Func<double, double, (double, double)> vCalc = (double x, double y) => DomainManager.VelocityFromFixedSpaceArray(x,y,xMin,dx,yMin,dy,xSpeed,ySpeed,false);
+            Func<double, double, (double, double)> vCalc = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,xSpeed,ySpeed,false);
             PointManager pointManager = new PointManager(nPoints,vCalc);
 
             // Scatter N points randomly over the domain
-            (double[] xInitial, double[] yInitial) = DomainManager.MapRandomToXY(xLims[0],xLims[1],yLims[0],yLims[1],nInitial,RNG);
+            (double[] xInitial, double[] yInitial) = domainManager.MapRandomToXY(nInitial,RNG);
             pointManager.CreatePointSet(xInitial,yInitial);
 
             foreach (LGPoint point in pointManager.ActivePoints)
             {
-                point.SetTemperature(DomainManager.NearestNeighbor(point.X,point.Y,xMin,dx,yMin,dy,griddedTemperature));
-                point.SetSpecificHumidity(DomainManager.NearestNeighbor(point.X,point.Y,xMin,dx,yMin,dy,griddedSpecificHumidity));
+                point.SetTemperature(domainManager.NearestNeighbor(point.X,point.Y,griddedTemperature));
+                point.SetSpecificHumidity(domainManager.NearestNeighbor(point.X,point.Y,griddedSpecificHumidity));
             }
 
-            // Define boundary edges, normals etc
-            ( Vector2[] xyPosts, Vector2[] boundaryNormals) = DomainManager.CreateBoundary(xMesh,yMesh);
-
             // Estimate the boundary velocity, given the velocity array (now in m/s)
-            Func<double, double, (double, double)> vCalcMPS = (double x, double y) => DomainManager.VelocityFromFixedSpaceArray(x,y,xMin,dx,yMin,dy,xSpeed,ySpeed,true);
-            Vector2[] vBoundary = DomainManager.GetBoundaryVelocities(xyPosts, vCalcMPS);
+            Func<double, double, (double, double)> vCalcMPS = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,xSpeed,ySpeed,true);
+            Vector2[] vBoundary = domainManager.GetBoundaryVelocities(vCalcMPS);
 
             // Set up output
             // Add a 2D variable
@@ -216,8 +154,7 @@ namespace LGTracer
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // TODO: Make this only at locations where we have inbound flow?
                 //(double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
-                (double[] xSet, double[] ySet, massSurplus) = DomainManager.SeedBoundary(kgPerPoint, boundaryLengths, pressureDelta, dt,
-                    xyPosts, boundaryNormals, vBoundary, RNG, massSurplus);
+                (double[] xSet, double[] ySet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, pressureDelta, dt, vBoundary, RNG, massSurplus);
 
                 pointManager.CreatePointSet(xSet, ySet);
 
@@ -225,7 +162,7 @@ namespace LGTracer
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
                 pointManager.Advance(dt);
 
-                DomainManager.Cull(xLims,yLims,pointManager);
+                domainManager.Cull(pointManager);
 
                 nSteps++;
                 tCurr = (iter+1) * dt;
