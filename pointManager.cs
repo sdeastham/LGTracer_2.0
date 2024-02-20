@@ -5,6 +5,10 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
+using Microsoft.Research.Science.Data;
+using Microsoft.Research.Science.Data.Imperative;
+using Microsoft.Research.Science.Data.NetCDF4;
+
 namespace LGTracer
 {
     public class PointManager
@@ -34,10 +38,6 @@ namespace LGTracer
         { get; private set; }
 
         public Func<double, double, (double, double)> VelocityCalc
-        { get; protected set; }
-
-        // Calculate all values and return them as a struct
-        public Func<double, double, InterpolatedProperties> ValueCalc
         { get; protected set; }
 
         private bool Debug
@@ -140,16 +140,83 @@ namespace LGTracer
                 point.Advance(dt);
             }
         }
-    }
 
-    public struct InterpolatedProperties
-    {
-        public InterpolatedProperties(double temperature, double specificHumidity)
+        public bool WriteToFile(string fileName, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, int maxActive)
         {
-            Temperature = temperature;
-            SpecificHumidity = specificHumidity;
+            bool success = true;
+
+            // Set up output file
+            var dsUri = new NetCDFUri
+            {
+                FileName = fileName,
+                OpenMode = ResourceOpenMode.Create
+            };
+
+            // Get the output sizes
+            int nPoints = Math.Min(maxActive,xHistory[0].Length);
+            int nTimes = time.Count;
+
+            int[] index = new int[nPoints];
+            for (int i=0; i<nPoints; i++ )
+            {
+                index[i] = i;
+            }
+            
+            // Convert the lists into conventional 2D arrays
+            double[,] x2D = new double[nTimes, nPoints];
+            double[,] y2D = new double[nTimes, nPoints];
+            uint[,] UIDs = new uint[nTimes, nPoints];
+
+            for (int i=0; i<nTimes; i++)
+            {
+                for (int j=0; j<nPoints; j++)
+                {
+                    x2D[i,j] = xHistory[i][j];
+                    y2D[i,j] = yHistory[i][j];
+                    UIDs[i,j] = UIDHistory[i][j];
+                }
+            }
+
+            using (DataSet ds = DataSet.Open(dsUri))
+            {
+                ds.AddAxis("index","-",index);
+                ds.AddAxis("time","seconds",time.ToArray());
+                ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
+                ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
+                ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
+                ds.Commit();
+            }
+            
+            return success;
         }
-        public double Temperature{ get; }
-        public double SpecificHumidity{ get; }
+
+        public int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr)
+        {
+            int nPoints = this.MaxPoints;
+            double[] xPoints = new double[nPoints];
+            double[] yPoints = new double[nPoints];
+            uint[] UIDs = new uint[nPoints];
+            for (int i=0; i<nPoints; i++)
+            {
+                if (i<this.NActive)
+                {
+                    LGPoint point = this.ActivePoints[i];
+                    xPoints[i] = point.X;
+                    yPoints[i] = point.Y;
+                    UIDs[i] = point.UID;
+                }
+                else
+                {
+                    xPoints[i] = double.NaN;
+                    yPoints[i] = double.NaN;
+                    UIDs[i] = 0;
+                }
+            }
+            time.Add(tCurr);
+            xHistory.Add(xPoints);
+            yHistory.Add(yPoints);
+            UIDHistory.Add(UIDs);
+            return this.NActive;
+        }
     }
 }

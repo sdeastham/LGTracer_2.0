@@ -10,10 +10,6 @@ using MathNet.Numerics.Interpolation;
 using MathNet.Numerics.Random;
 //using MathNet.Numerics.Distributions;
 
-using Microsoft.Research.Science.Data;
-using Microsoft.Research.Science.Data.Imperative;
-using Microsoft.Research.Science.Data.NetCDF4;
-
 namespace LGTracer
 {
     public class Program
@@ -23,14 +19,6 @@ namespace LGTracer
             /* LGTracer is a very simple test code designed to simulate movement of points
             through a simple 2D space under the influence of a constant wind field. */
             Console.WriteLine("Initiating simple LGTracer program");
-
-            // Set up output file
-            string fileName = "output.nc";
-            var dsUri = new NetCDFUri
-            {
-                FileName = fileName,
-                OpenMode = ResourceOpenMode.Create
-            };
 
             // Number of Lagrangian points to track
             int nPoints = 100000;
@@ -45,6 +33,7 @@ namespace LGTracer
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
             string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.I3.05x0625.nc4";
+            string outputFileName = "output.nc";
 
             // Major simulation settings
             double nDays = 30.0; // Days to run
@@ -196,7 +185,7 @@ namespace LGTracer
 
             // Store initial conditions - keeping track of the largest number of points being
             // tracked at any given output time
-            int maxActive = ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager);
+            int maxActive = pointManager.ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr);
             tStorage += dtStorage;
             int nStored = 1;
 
@@ -246,7 +235,7 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    maxActive = Math.Max(maxActive,ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr,pointManager));
+                    maxActive = Math.Max(maxActive,pointManager.ArchiveConditions(time,xHistory,yHistory,UIDHistory,tCurr));
                     tStorage += dtStorage;
                     nStored += 1;
                 }
@@ -257,85 +246,16 @@ namespace LGTracer
             double msPerStep = elapsedTime/nSteps;
             Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
-            bool success = WriteToFile(dsUri,time,xHistory,yHistory,UIDHistory,maxActive);
+            bool success = pointManager.WriteToFile(outputFileName,time,xHistory,yHistory,UIDHistory,maxActive);
             if (success)
             {
-                Console.WriteLine($"Output data with {nStored} samples [max points stored: {maxActive}] successfully written to {fileName}");
+                Console.WriteLine($"Output data with {nStored} samples [max points stored: {maxActive}] successfully written to {outputFileName}");
             }
             else
             {
-                Console.WriteLine($"Could not write output to {fileName}");
+                Console.WriteLine($"Could not write output to {outputFileName}");
             }
 
-        }
-        private static bool WriteToFile(NetCDFUri dsUri, List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, int maxActive)
-        {
-            bool success = true;
-
-            // Get the output sizes
-            int nPoints = Math.Min(maxActive,xHistory[0].Length);
-            int nTimes = time.Count;
-
-            int[] index = new int[nPoints];
-            for (int i=0; i<nPoints; i++ )
-            {
-                index[i] = i;
-            }
-            
-            // Convert the lists into conventional 2D arrays
-            double[,] x2D = new double[nTimes, nPoints];
-            double[,] y2D = new double[nTimes, nPoints];
-            uint[,] UIDs = new uint[nTimes, nPoints];
-
-            for (int i=0; i<nTimes; i++)
-            {
-                for (int j=0; j<nPoints; j++)
-                {
-                    x2D[i,j] = xHistory[i][j];
-                    y2D[i,j] = yHistory[i][j];
-                    UIDs[i,j] = UIDHistory[i][j];
-                }
-            }
-
-            using (DataSet ds = DataSet.Open(dsUri))
-            {
-                ds.AddAxis("index","-",index);
-                ds.AddAxis("time","seconds",time.ToArray());
-                ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
-                ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
-                ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
-                ds.Commit();
-            }
-            
-            return success;
-        }
-        private static int ArchiveConditions(List<double> time, List<double[]> xHistory, List<double[]> yHistory, List<uint[]> UIDHistory, double tCurr, PointManager pointManager)
-        {
-            int nPoints = pointManager.MaxPoints;
-            double[] xPoints = new double[nPoints];
-            double[] yPoints = new double[nPoints];
-            uint[] UIDs = new uint[nPoints];
-            for (int i=0; i<nPoints; i++)
-            {
-                if (i<pointManager.NActive)
-                {
-                    LGPoint point = pointManager.ActivePoints[i];
-                    xPoints[i] = point.X;
-                    yPoints[i] = point.Y;
-                    UIDs[i] = point.UID;
-                }
-                else
-                {
-                    xPoints[i] = double.NaN;
-                    yPoints[i] = double.NaN;
-                    UIDs[i] = 0;
-                }
-            }
-            time.Add(tCurr);
-            xHistory.Add(xPoints);
-            yHistory.Add(yPoints);
-            UIDHistory.Add(UIDs);
-            return pointManager.NActive;
         }
 
         private static (double, double) VelocityConst( double x, double y, double xSpeed, double ySpeed)
