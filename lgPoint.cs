@@ -19,6 +19,13 @@ namespace LGTracer
         public uint UID
         { get; protected set; }
 
+        // This might need to be made more flexible
+        public double Temperature
+        { get; protected set; }
+
+        public double SpecificHumidity
+        { get; protected set; }
+
         // Convenience properties
         public double X
         { 
@@ -37,8 +44,8 @@ namespace LGTracer
             this._location = new Vector2(float.NaN,float.NaN);
             this.InitialLocation = new Vector2(float.NaN,float.NaN);
             this.VelocityCalc = vCalc;
-            this.UID = 0; // Reserved for inactive points
-            this.Active = false;
+            // Set the rest of the properties by deactivating the point
+            this.Deactivate();
         }
 
         public void Activate( double x, double y, uint uniqueID )
@@ -58,6 +65,19 @@ namespace LGTracer
             this.X = double.NaN;
             this.Y = double.NaN;
             this.UID = 0;
+            // Properties
+            this.Temperature = double.NaN;
+            this.SpecificHumidity = double.NaN;
+        }
+
+        public void SetTemperature( double value )
+        {
+            this.Temperature = value;
+        }
+
+        public void SetSpecificHumidity( double value )
+        {
+            this.SpecificHumidity = value;
         }
 
         public void Advance( double dt )

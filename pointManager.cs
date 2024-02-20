@@ -36,6 +36,10 @@ namespace LGTracer
         public Func<double, double, (double, double)> VelocityCalc
         { get; protected set; }
 
+        // Calculate all values and return them as a struct
+        public Func<double, double, InterpolatedProperties> ValueCalc
+        { get; protected set; }
+
         private bool Debug
         { get; set; }
 
@@ -69,8 +73,7 @@ namespace LGTracer
 
         private LGPoint ActivatePoint( double x, double y )
         {
-            // Reactivate a dormant point and assigns it a new UID
-            //LGPoint point = InactivePoints.RemoveAt(0);
+            // Reactivate the first available dormant point and assign it a new UID
             LGPoint point = InactivePoints[0];
             ActivePoints.Add(point);
             InactivePoints.RemoveAt(0);
@@ -87,19 +90,27 @@ namespace LGTracer
             // If no points are available, add one if possible; otherwise throw an exception
 
             // Are there any inactive points available?
+            LGPoint point;
             if (NInactive > 0)
             {
                 // Reactivate a dormant point
-                return ActivatePoint(x,y);
+                point = ActivatePoint(x,y);
             }
-            if (NActive < MaxPoints)
+            else if (NActive < MaxPoints)
             {
                 // Add a new point
-                return AddPoint(x,y);
+                point = AddPoint(x,y);
             }
-            // No more points to return!
-            //if (Debug) {Console.WriteLine("!!!");}
-            throw new InvalidOperationException("Point maximum exceeded");
+            else
+            {
+                // No more points to return!
+                //if (Debug) {Console.WriteLine("!!!");}
+                throw new InvalidOperationException("Point maximum exceeded");
+            }
+            // Set point properties based on local values
+            
+
+            return point;
         }
 
         public void DeactivatePoint( int index )
@@ -129,5 +140,16 @@ namespace LGTracer
                 point.Advance(dt);
             }
         }
+    }
+
+    public struct InterpolatedProperties
+    {
+        public InterpolatedProperties(double temperature, double specificHumidity)
+        {
+            Temperature = temperature;
+            SpecificHumidity = specificHumidity;
+        }
+        public double Temperature{ get; }
+        public double SpecificHumidity{ get; }
     }
 }
