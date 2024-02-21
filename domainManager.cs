@@ -219,8 +219,8 @@ namespace LGTracer
             // Inefficient as we repeat the neighbor calculation
             double dxdt = NearestNeighbor(x,y,pressure,XSpeedXY);
             double dydt = NearestNeighbor(x,y,pressure,YSpeedXY);
-            //double dpdt = NearestNeighbor(x,y,pressure,PressureVelocityXY);
-            double dpdt = 0.0;
+            double dpdt = NearestNeighbor(x,y,pressure,PressureVelocityXY);
+            //double dpdt = 0.0;
             if (noConvert)
             {
                 return (dxdt,dydt,dpdt);
