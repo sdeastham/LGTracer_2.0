@@ -194,7 +194,7 @@ namespace LGTracer
         {
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
-            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DY)),NX-1);
+            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DX)),NX-1);
             int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - YMin)/DY)),NY-1);
 
             // Values in m/s
