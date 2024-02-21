@@ -28,6 +28,9 @@ namespace LGTracer
         public int NY
         { get; protected set; }
 
+        public int NLevels
+        { get; protected set; }
+
         public double DX
         { get; protected set; }
 
@@ -61,20 +64,50 @@ namespace LGTracer
         public Vector2[] BoundaryPosts
         { get; protected set; }
 
-        public double[,] XSpeedGridded
+        public double[,] XSpeedXY
         { get; protected set; }
 
-        public double[,] YSpeedGridded
+        public double[,] YSpeedXY
+        { get; protected set; }
+        
+        public double[,] PressureVelocityXY
         { get; protected set; }
 
-        public double[,] TemperatureGridded
+        public double[,] SurfacePressureXY
         { get; protected set; }
 
-        public double[,] SpecificHumidityGridded
+        public double[,,] PressureEdgeXYPe
         { get; protected set; }
 
-        public DomainManager(double[] lonEdge, double[] latEdge)
+        public double[,] TemperatureXY
+        { get; protected set; }
+
+        public double[,] SpecificHumidityXY
+        { get; protected set; }
+
+        public double PBase
+        { get; protected set; }
+
+        public double PCeiling
+        { get; protected set; }
+
+        protected double[] AP
+        { get; set; }
+
+        protected double[] BP
+        { get; set; }
+
+        public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors)
         {
+            // Set up the vertical coordinates
+            PBase = pLimits[0];
+            PCeiling = pLimits[1];
+
+            // Set up the factors needed to calculate pressure edges
+            AP = pOffsets;
+            BP = pFactors;
+            NLevels = AP.Length + 1;
+
             // Set up the mesh (units of degrees)
             // The original lon/lat limits aren't important - need the mesh limits
             int xPosts = lonEdge.Length;
@@ -152,46 +185,56 @@ namespace LGTracer
             CreateBoundary();
 
             // Set up the meteorological data
-            XSpeedGridded = new double[NY,NX];
-            YSpeedGridded = new double[NY,NX];
-            TemperatureGridded = new double[NY,NX];
-            SpecificHumidityGridded = new double[NY,NX];
+            XSpeedXY = new double[NY,NX];
+            YSpeedXY = new double[NY,NX];
+            SurfacePressureXY = new double[NY,NX];
+            PressureEdgeXYPe = new double[NLevels+1,NY,NX];
+            PressureVelocityXY = new double[NY,NX];
+            TemperatureXY = new double[NY,NX];
+            SpecificHumidityXY = new double[NY,NX];
         }
 
-        public void UpdateMeteorology( double[,] xSpeed, double[,] ySpeed, double[,] temperature, double[,] specificHumidity )
+        public void UpdateMeteorology( double[,] surfacePressure, double[,] xSpeed, double[,] ySpeed, double[,] omega, double[,] temperature, double[,] specificHumidity )
         {
             for (int i=0; i<NX; i++)
             {
                 for (int j=0; j<NY; j++)
                 {
-                    XSpeedGridded[j,i] = xSpeed[j,i];
-                    YSpeedGridded[j,i] = ySpeed[j,i];
-                    TemperatureGridded[j,i] = temperature[j,i];
-                    SpecificHumidityGridded[j,i] = specificHumidity[j,i];
+                    SurfacePressureXY[j,i] = surfacePressure[j,i];
+                    XSpeedXY[j,i] = xSpeed[j,i];
+                    YSpeedXY[j,i] = ySpeed[j,i];
+                    PressureVelocityXY[j,i] = omega[j,i];
+                    TemperatureXY[j,i] = temperature[j,i];
+                    SpecificHumidityXY[j,i] = specificHumidity[j,i];
                 }
             }
+            // Get the pressure edges too
+            PressureEdgeXYPe = CalculatePressures(SurfacePressureXY);
         }
 
-        public (double, double) VelocityFromFixedSpaceArray( double x, double y, bool noConvert=false)
+        public (double, double, double) VelocityFromFixedSpaceArray( double x, double y, double pressure, bool noConvert=false)
         {
             // Extract the velocity vector from an array
             // Values in m/s
             // Inefficient as we repeat the neighbor calculation
-            double dxdt = NearestNeighbor(x,y,XSpeedGridded);
-            double dydt = NearestNeighbor(x,y,YSpeedGridded);
+            double dxdt = NearestNeighbor(x,y,pressure,XSpeedXY);
+            double dydt = NearestNeighbor(x,y,pressure,YSpeedXY);
+            //double dpdt = NearestNeighbor(x,y,pressure,PressureVelocityXY);
+            double dpdt = 0.0;
             if (noConvert)
             {
-                return (dxdt,dydt);
+                return (dxdt,dydt,dpdt);
             }
 
-            // Convert from m/s to deg/s
+            // Convert from m/s to deg/s (keep omega as Pa/s)
             dxdt = LGConstants.Rad2Deg * dxdt / (LGConstants.EarthRadius * Math.Cos(LGConstants.Deg2Rad*y));
             dydt = LGConstants.Rad2Deg * dydt / LGConstants.EarthRadius;
-            return (dxdt, dydt);
+            return (dxdt, dydt, dpdt);
         }
 
-        public double NearestNeighbor( double x, double y, double[,] valueArray)
+        public double NearestNeighbor( double x, double y, double pressure, double[,] valueArray)
         {
+            // Ignore pressure for now
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
             int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DX)),NX-1);
@@ -199,49 +242,6 @@ namespace LGTracer
 
             // Values in m/s
             return valueArray[yIndex,xIndex];
-        }
-
-        public (double[], double[]) SeedBoundaryUniform(int nPoints, System.Random RNG)
-        {
-            // Seed the domain boundaries completely uniformly
-            double xSpan = XMax - XMin;
-            double ySpan = YMax - YMin;
-            double xCurr, yCurr;
-            double smallDelta = 1.0e-5;
-            double randomVal;
-
-            double[] xVals = new double[nPoints];
-            double[] yVals = new double[nPoints];
-            
-            for (int i=0; i<nPoints; i++)
-            {
-                // Activate the point at a location randomly chosen from the domain edge
-                // Algorithm below basically goes around the edges of the domain in order
-                randomVal = RNG.NextDouble() * ((xSpan*2) + (ySpan*2));
-                if (randomVal < xSpan)
-                {
-                    yCurr = YMin + smallDelta;
-                    xCurr = XMin + randomVal;
-                }
-                else if (randomVal < (xSpan + ySpan))
-                {
-                    yCurr = YMin + (randomVal - xSpan);
-                    xCurr = XMax - smallDelta;
-                }
-                else if (randomVal < (xSpan + ySpan + xSpan))
-                {
-                    yCurr = YMax - smallDelta;
-                    xCurr = XMin + (randomVal - (xSpan + ySpan));
-                }
-                else
-                {
-                    yCurr = YMin + (randomVal - (xSpan + ySpan + xSpan));
-                    xCurr = XMin + smallDelta;
-                }
-                xVals[i] = xCurr;
-                yVals[i] = yCurr;
-            }
-            return (xVals, yVals);
         }
 
         [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals))]
@@ -311,8 +311,9 @@ namespace LGTracer
 
         public Vector2[] GetBoundaryVelocities()
         {
+            // u,v velocities at the cell edges
             int nCells = BoundaryPosts.Length - 1;
-            double u, v, x, y;
+            double u, v, w, x, y, pressure;
             Vector2 xyMid;
             Vector2[] vBoundary = new Vector2[nCells];
             for (int i=0; i<nCells; i++)
@@ -320,14 +321,14 @@ namespace LGTracer
                 xyMid = BoundaryPosts[i] + (0.5f * (BoundaryPosts[i+1] - BoundaryPosts[i]));
                 x = (double)xyMid.X;
                 y = (double)xyMid.Y;
-                (u, v) = VelocityFromFixedSpaceArray(x,y,true);
+                pressure = (PBase + PCeiling)/2.0;
+                (u, v, w) = VelocityFromFixedSpaceArray(x,y,pressure,true);
                 vBoundary[i] = new Vector2((float)u,(float)v);
             }
             return vBoundary;
         }
 
-        public (double[], double[], double) SeedBoundary(double kgPerPoint, double pressureDelta, double dt,
-            System.Random RNG, double massSurplus = 0.0)
+        public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
         {
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
@@ -339,8 +340,8 @@ namespace LGTracer
             double vNorm;
             double[] massFluxes = new double[nEdges];
             double[] weighting;
+            double pressureDelta = PBase - PCeiling;
 
-            //Func<double, double, (double, double)> vCalcMPS = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,true);
             Vector2[] vBoundary = GetBoundaryVelocities();
 
             for (int i=0; i<nEdges; i++)
@@ -377,6 +378,7 @@ namespace LGTracer
             //Console.WriteLine($"Expecting {nPointsTotal} new points");
             double[] xVals = new double[nPointsTotal];
             double[] yVals = new double[nPointsTotal];
+            double[] pressureVals = new double[nPointsTotal];
             int iCell;
             for (int iPoint=0; iPoint < nPointsTotal; iPoint++)
             {
@@ -399,26 +401,57 @@ namespace LGTracer
                 pointLocation = BoundaryPosts[iCell] + ((float)cellFrac * boundaryVector) + ((float)smallDelta * BoundaryNormals[iCell]);
                 xVals[iPoint] = pointLocation.X;
                 yVals[iPoint] = pointLocation.Y;
+                // Initialize pressure randomly - unrelated to other concerns
+                pressureVals[iPoint] = RNG.NextDouble() * (PBase - PCeiling) + PCeiling;
             }
-            return (xVals, yVals, massSurplus);
+            return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[]) MapRandomToXY( int nPoints, System.Random rng )
+        public (double[], double[], double[]) MapRandomToXYP( int nPoints, System.Random rng )
         {
             // Scatter randomly throughout domain
             double xSpan = XMax - XMin;
             double xStart = XMin;
             double ySpan = YMax - YMin;
             double yStart = YMin;
+            double pStart = PCeiling;
+            double pSpan = PBase - PCeiling;
 
             double[] xInitial = new double[nPoints];
             double[] yInitial = new double[nPoints];
+            double[] pressureInitial = new double[nPoints];
             for (int i=0; i<nPoints; i++)
             {
                 xInitial[i] = rng.NextDouble()*xSpan + xStart;
                 yInitial[i] = rng.NextDouble()*ySpan + yStart;
+                pressureInitial[i] = rng.NextDouble()*pSpan + pStart;
             }
-            return (xInitial, yInitial);
+            return (xInitial, yInitial, pressureInitial);
+        }
+
+        public double[,,] CalculatePressures(double[,] surfacePressure)
+        {
+            // Calculate pressures at grid cell edges given surface pressures
+            // AP and surfacePressure must be in the same units
+            int nY = surfacePressure.GetLength(0);
+            int nX = surfacePressure.GetLength(1);
+            int nLevels = AP.Length;
+            double[,,] pressureEdges = new double[nLevels,nY,nX];
+            double localPS;
+            for (int i=0; i<nX; i++)
+            {
+                for (int j=0; j<nY; j++)
+                {
+                    // Surface pressure
+                    localPS = surfacePressure[j,i];
+                    // Hybrid eta calculation
+                    for (int level=0; level<nLevels; level++)
+                    {
+                        pressureEdges[level,j,i] = (localPS * BP[level]) + AP[level];
+                    }
+                }
+            }            
+            return pressureEdges;
         }
     }
 }

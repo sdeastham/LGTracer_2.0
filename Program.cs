@@ -49,14 +49,19 @@ namespace LGTracer
 
             // Read in MERRA-2 data and use that to set domain
             (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
-            // Now read in the U and V data
-            (double[,]uWind, double[,]vWind ) = MERRA2.ReadA3( metFileNameA3, readTime, readLevel, lonSet, latSet );
+            // Now read in the U and V data, as well as pressure velocities
+            (double[,]uWind, double[,]vWind, double[,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, readLevel, lonSet, latSet );
             // Also read in PS, T, and QV
             (double[,] surfacePressure, double[,]griddedTemperature, double[,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, readLevel, lonSet, latSet );
 
+            // These will be used more once we have 3D arrays - for now just impose these
+            // Approximate bounds of layer 30: 250 hPa, 200 hPa
+            double[] pLims = [25000.0, 20000.0];
+            
             // Set up the domain
-            DomainManager domainManager = new DomainManager(lonEdge, latEdge);
+            DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
 
+            /*
             int xCells     = domainManager.NX;
             int yCells     = domainManager.NY;
             double xMin    = domainManager.XMin;
@@ -65,9 +70,10 @@ namespace LGTracer
             double dy      = domainManager.DY;
             double[] xLims = domainManager.XLims;
             double[] yLims = domainManager.YLims;
+            */
 
             // Set up the domain meteorology
-            domainManager.UpdateMeteorology(uWind,vWind,griddedTemperature,griddedSpecificHumidity);
+            domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
 
             // Time handling
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
@@ -88,8 +94,8 @@ namespace LGTracer
             PointManager pointManager = new PointManager(nPoints,domainManager);
 
             // Scatter N points randomly over the domain
-            (double[] xInitial, double[] yInitial) = domainManager.MapRandomToXY(nInitial,RNG);
-            pointManager.CreatePointSet(xInitial,yInitial);
+            (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(nInitial,RNG);
+            pointManager.CreatePointSet(xInitial,yInitial,pInitial);
 
             // Set up output
             // Store initial conditions
@@ -97,13 +103,13 @@ namespace LGTracer
             tStorage += dtStorage;
             int nStored = 1;
 
-            int nNew, nAvailable;
+            //int nNew, nAvailable;
 
             // We only add an integer number of points each time step
             // If the number of points to be added is non-integer, retain
             // the surplus and add it in at the next time step
-            double nNewExact;
-            double nSurplus = 0.0;
+            //double nNewExact;
+            //double nSurplus = 0.0;
             double massSurplus = 0.0;
             
             // Set up timing
@@ -114,19 +120,19 @@ namespace LGTracer
             for (int iter=0;iter<iterMax; iter++)
             {
                 // How many new points will we add (allowing for variable dt)?
+                /*
                 nNewExact = (pointRate * dt) + nSurplus;
                 nNew = (int) Math.Floor(nNewExact);
                 nSurplus = nNewExact - (double)nNew;
 
                 // We want to introduce nNew at the edge, but we can only go up to nInactive
                 nAvailable = Math.Min(pointManager.MaxPoints - pointManager.NActive,nNew);
+                */
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
-                // TODO: Make this only at locations where we have inbound flow?
-                //(double[] xSet, double[] ySet) = SeedBoundaryUniform(nAvailable,xLims,yLims,RNG);
-                (double[] xSet, double[] ySet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, pressureDelta, dt, RNG, massSurplus);
+                (double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
 
-                pointManager.CreatePointSet(xSet, ySet);
+                pointManager.CreatePointSet(xSet, ySet, pSet);
 
                 // Do the actual work
                 if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
@@ -153,6 +159,12 @@ namespace LGTracer
             double msPerStep = elapsedTime/nSteps;
             Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
+            double xMin = domainManager.XMax;
+            foreach (LGPoint point in pointManager.ActivePoints)
+            {
+                xMin = Math.Min(xMin,point.X);
+            }
+
             bool success = pointManager.WriteToFile(outputFileName);
             if (success)
             {
@@ -162,13 +174,6 @@ namespace LGTracer
             {
                 Console.WriteLine($"Could not write output to {outputFileName}");
             }
-
-        }
-
-        private static (double, double) VelocityConst( double x, double y, double xSpeed, double ySpeed)
-        {
-            // Return a fixed velocity
-            return (xSpeed, ySpeed);
         }
     }
 }

@@ -37,7 +37,7 @@ namespace LGTracer
         public int MaxPoints
         { get; private set; }
 
-        public Func<double, double, (double, double)> VelocityCalc
+        public Func<double, double, double, (double, double, double)> VelocityCalc
         { get; protected set; }
 
         public DomainManager Domain
@@ -47,6 +47,9 @@ namespace LGTracer
         { get; set; }
 
         private List<double[]> YHistory
+        { get; set; }
+
+        private List<double[]> PressureHistory
         { get; set; }
 
         private List<double[]> TemperatureHistory
@@ -73,7 +76,7 @@ namespace LGTracer
             nextUID = 1;
 
             // Set the velocity calculation
-            Func<double, double, (double, double)> vCalc = (double x, double y) => domain.VelocityFromFixedSpaceArray(x,y,false);
+            Func<double, double, double, (double, double, double)> vCalc = (double x, double y, double pressure) => domain.VelocityFromFixedSpaceArray(x,y,pressure,false);
             VelocityCalc = vCalc;
 
             // Limit on how many points can be managed
@@ -89,6 +92,7 @@ namespace LGTracer
             TimeHistory = [];
             XHistory = [];
             YHistory = [];
+            PressureHistory = [];
             UIDHistory = [];
 
             TemperatureHistory = [];
@@ -101,17 +105,17 @@ namespace LGTracer
             Debug = debug;
         }
 
-        private LGPoint AddPoint( double x, double y )
+        private LGPoint AddPoint( double x, double y, double pressure )
         {
             // Create a new point in the list
             // Start by creating an _inactive_ point
             LGPoint point = new LGPoint(VelocityCalc);
             InactivePoints.Add(point);
             // Activate a point (doesn't matter if it's the same one) and return it
-            return ActivatePoint(x,y);
+            return ActivatePoint(x,y,pressure);
         }
 
-        private LGPoint ActivatePoint( double x, double y )
+        private LGPoint ActivatePoint( double x, double y, double pressure )
         {
             // Reactivate the first available dormant point and assign it a new UID
             LGPoint point = InactivePoints[0];
@@ -120,11 +124,11 @@ namespace LGTracer
 
             // Give the point its location and a new UID
             // Requesting the UID will automatically increment it
-            point.Activate(x,y,NextUID);
+            point.Activate(x,y,pressure,NextUID);
             return point;
         }
 
-        public LGPoint NextPoint( double x, double y )
+        public LGPoint NextPoint( double x, double y, double pressure )
         {
             // Function places a new point, taken from the inactive list if any available.
             // If no points are available, add one if possible; otherwise throw an exception
@@ -134,12 +138,12 @@ namespace LGTracer
             if (NInactive > 0)
             {
                 // Reactivate a dormant point
-                point = ActivatePoint(x,y);
+                point = ActivatePoint(x,y,pressure);
             }
             else if (NActive < MaxPoints)
             {
                 // Add a new point
-                point = AddPoint(x,y);
+                point = AddPoint(x,y,pressure);
             }
             else
             {
@@ -148,8 +152,8 @@ namespace LGTracer
                 throw new InvalidOperationException("Point maximum exceeded");
             }
             // Set point properties based on local values#
-            double temperature = Domain.NearestNeighbor(x,y,Domain.TemperatureGridded);
-            double specificHumidity = Domain.NearestNeighbor(x,y,Domain.SpecificHumidityGridded);
+            double temperature = Domain.NearestNeighbor(x,y,pressure,Domain.TemperatureXY);
+            double specificHumidity = Domain.NearestNeighbor(x,y,pressure,Domain.SpecificHumidityXY);
             point.SetTemperature(temperature);
             point.SetSpecificHumidity(specificHumidity);
 
@@ -165,22 +169,26 @@ namespace LGTracer
             ActivePoints.RemoveAt(index);
         }
 
-        public void CreatePointSet( double[] x, double[] y )
+        public void CreatePointSet( double[] x, double[] y, double[] pressure )
         {
             // Create multiple points
             for (int i=0; i<x.Length; i++)
             {
-                NextPoint(x[i],y[i]);
+                NextPoint(x[i],y[i],pressure[i]);
             }
         }
 
         public void Advance( double dt )
         {
             // Advances all active points one time step
+            //Console.WriteLine("ADVANCING");
             foreach (LGPoint point in ActivePoints)
             {
                 //Console.WriteLine($"{point.UID,5:d}: {point.X,7:f2}/{point.Y,7:f2}");
+                //double oldP = point.Pressure;
                 point.Advance(dt);
+                //double newP = point.Pressure;
+                //Console.WriteLine($"{point.UID,5:d}: {oldP,6:f2} -> {newP,6:f2}");
             }
         }
 
@@ -188,11 +196,18 @@ namespace LGTracer
         {
             // Deactivate any points which are outside the domain
             // Could also do this with LINQ
+            //Console.WriteLine("CULLING");
             for (int i=NActive-1; i>=0; i--)
             {
                 LGPoint point = ActivePoints[i];
-                if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax )
+                if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax || point.Pressure > Domain.PBase || point.Pressure < Domain.PCeiling )
                 {
+                    /*
+                    if (point.Age < 1800.0)
+                    {
+                        Console.WriteLine($"{point.UID,5:d}: {point.X,6:f2}/{point.Y,6:f2}, {point.Pressure,6:f1}");
+                    }
+                    */
                     DeactivatePoint(i);
                 }
             }
@@ -210,7 +225,7 @@ namespace LGTracer
             };
 
             // Get the output sizes
-            int nPoints = Math.Min(MaxStoredPoints,XHistory[0].Length);
+            int nPoints = MaxStoredPoints;//Math.Min(MaxStoredPoints,XHistory[0].Length);
             int nTimes = TimeHistory.Count;
 
             int[] index = new int[nPoints];
@@ -222,19 +237,35 @@ namespace LGTracer
             // Convert the lists into conventional 2D arrays
             double[,] x2D = new double[nTimes, nPoints];
             double[,] y2D = new double[nTimes, nPoints];
+            double[,] p2D = new double[nTimes, nPoints];
             double[,] temperature2D = new double[nTimes, nPoints];
             double[,] specificHumidity2D = new double[nTimes, nPoints];
             uint[,] UIDs = new uint[nTimes, nPoints];
+            int nCurrent;
 
             for (int i=0; i<nTimes; i++)
             {
+                nCurrent = XHistory[i].Length;
                 for (int j=0; j<nPoints; j++)
                 {
-                    x2D[i,j] = XHistory[i][j];
-                    y2D[i,j] = YHistory[i][j];
-                    temperature2D[i,j] = TemperatureHistory[i][j];
-                    specificHumidity2D[i,j] = SpecificHumidityHistory[i][j];
-                    UIDs[i,j] = UIDHistory[i][j];
+                    if (j < nCurrent)
+                    {
+                        x2D[i,j] = XHistory[i][j];
+                        y2D[i,j] = YHistory[i][j];
+                        p2D[i,j] = PressureHistory[i][j];
+                        temperature2D[i,j] = TemperatureHistory[i][j];
+                        specificHumidity2D[i,j] = SpecificHumidityHistory[i][j];
+                        UIDs[i,j] = UIDHistory[i][j];
+                    }
+                    else
+                    {
+                        x2D[i,j] = double.NaN;
+                        y2D[i,j] = double.NaN;
+                        p2D[i,j] = double.NaN;
+                        temperature2D[i,j] = double.NaN;
+                        specificHumidity2D[i,j] = double.NaN;
+                        UIDs[i,j] = 0;
+                    }
                 }
             }
 
@@ -244,6 +275,7 @@ namespace LGTracer
                 ds.AddAxis("time","seconds",TimeHistory.ToArray());
                 ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
+                ds.AddVariable(typeof(double), "pressure", p2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "temperature", temperature2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "specific_humidity", specificHumidity2D, ["time","index"]);
                 ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
@@ -256,35 +288,27 @@ namespace LGTracer
         public void ArchiveConditions(double tCurr)
         {
             MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
-            int nPoints = MaxStoredPoints;
+            int nPoints = NActive;
             double[] xPoints                = new double[nPoints];
             double[] yPoints                = new double[nPoints];
+            double[] pressurePoints         = new double[nPoints];
             double[] temperaturePoints      = new double[nPoints];
             double[] specificHumidityPoints = new double[nPoints];
             uint[] UIDs = new uint[nPoints];
             for (int i=0; i<nPoints; i++)
             {
-                if (i<NActive)
-                {
-                    LGPoint point = ActivePoints[i];
-                    xPoints[i] = point.X;
-                    yPoints[i] = point.Y;
-                    temperaturePoints[i] = point.Temperature;
-                    specificHumidityPoints[i] = point.SpecificHumidity;
-                    UIDs[i] = point.UID;
-                }
-                else
-                {
-                    xPoints[i] = double.NaN;
-                    yPoints[i] = double.NaN;
-                    temperaturePoints[i] = double.NaN;
-                    specificHumidityPoints[i] = double.NaN;
-                    UIDs[i] = 0;
-                }
+                LGPoint point = ActivePoints[i];
+                xPoints[i] = point.X;
+                yPoints[i] = point.Y;
+                pressurePoints[i] = point.Pressure;
+                temperaturePoints[i] = point.Temperature;
+                specificHumidityPoints[i] = point.SpecificHumidity;
+                UIDs[i] = point.UID;
             }
             TimeHistory.Add(tCurr);
             XHistory.Add(xPoints);
             YHistory.Add(yPoints);
+            PressureHistory.Add(pressurePoints);
             TemperatureHistory.Add(temperaturePoints);
             SpecificHumidityHistory.Add(specificHumidityPoints);
             UIDHistory.Add(UIDs);
