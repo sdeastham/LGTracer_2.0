@@ -23,7 +23,6 @@ namespace LGTracer
             // Number of Lagrangian points to track
             int nPoints = 100000;
             int nInitial = 1000; // Points to initially scatter randomly
-            double pointRate = 50.0/600.0; // Number of new points to add in each second
             bool debug = false;
 
             // Specify the domains
@@ -41,7 +40,6 @@ namespace LGTracer
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
 
             // Point settings
-            double pressureDelta = 10.0e2; // Layer pressure thickness in Pa. This helps to determine how many points to seed
             double kgPerPoint = 2.0e12; // Air mass represented by a single point (mass flows are huge - but 1e11 seems very high? Total atm mass 5.1e18!)
 
 
@@ -61,19 +59,10 @@ namespace LGTracer
             // Set up the domain
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
 
-            /*
-            int xCells     = domainManager.NX;
-            int yCells     = domainManager.NY;
-            double xMin    = domainManager.XMin;
-            double dx      = domainManager.DX;
-            double yMin    = domainManager.YMin;
-            double dy      = domainManager.DY;
-            double[] xLims = domainManager.XLims;
-            double[] yLims = domainManager.YLims;
-            */
-
             // Set up the domain meteorology
             domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
+
+            Console.WriteLine($"Total area: {domainManager.CellArea.Cast<double>().Sum()}");
 
             // Time handling
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds

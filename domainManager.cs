@@ -97,6 +97,9 @@ namespace LGTracer
         protected double[] BP
         { get; set; }
 
+        public double[,] CellArea
+        { get; protected set; }
+
         public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors)
         {
             // Set up the vertical coordinates
@@ -156,6 +159,9 @@ namespace LGTracer
                 }
             }
 
+            // Cell areas
+            SetCellAreas();
+
             // Boundary lengths (m)
             BoundaryLengths = new double[NX*2 + NY*2];
             double earthCircumference = 2.0 * Math.PI * LGConstants.EarthRadius;
@@ -192,6 +198,31 @@ namespace LGTracer
             PressureVelocityXY = new double[NY,NX];
             TemperatureXY = new double[NY,NX];
             SpecificHumidityXY = new double[NY,NX];
+        }
+
+        [MemberNotNull(nameof(CellArea))]
+        private void SetCellAreas()
+        {
+            double[] yRad = new double[NY + 1];
+            for (int i=0; i<(NY+1); i++)
+            {
+                yRad[i] = YMesh[i] * LGConstants.Deg2Rad;
+            }
+
+            // Total surface area in each meridional band (assuming regular spacing)
+            double bandArea = LGConstants.EarthRadius * LGConstants.EarthRadius * DX * LGConstants.Deg2Rad;
+            CellArea = new double[NY,NX];
+            double sinDiff, singleCellArea;
+            for (int iLat=0; iLat<NY; iLat++)
+            {
+                // Fraction of a single band taken up by one cell
+                sinDiff = Math.Sin(yRad[iLat+1]) - Math.Sin(yRad[iLat]);
+                singleCellArea = sinDiff * bandArea;
+                for (int iLon=0; iLon<NX; iLon++)
+                {
+                    CellArea[iLat,iLon] = singleCellArea;
+                }
+            }
         }
 
         public void UpdateMeteorology( double[,] surfacePressure, double[,] xSpeed, double[,] ySpeed, double[,] omega, double[,] temperature, double[,] specificHumidity )
