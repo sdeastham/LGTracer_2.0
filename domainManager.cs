@@ -438,6 +438,102 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
+        public (double[], double[], double[], double) SeedPressureBoundaries(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
+        {
+            // Seed the upper and lower domain boundaries proportional to vertical mass flow rate
+            // Position along boundary for each cell is random
+            int nFaces = NX * NY;
+            double smallDelta = 1.0e-5; // This is now in pressure terms
+            double massFlux, cellFrac, randomVal;
+            double nPoints;
+            Vector2 pointLocation;
+            double vNorm;
+            // Double because we will deal with upper and lower boundary together
+            double[] massFluxes = new double[nFaces*2];
+            double[] weighting;
+            double pressureDelta = PBase - PCeiling;
+
+            int iFace = 0;
+            for (int i=0; i<NX; i++)
+            {
+                for (int j=0; j<NY; j++)
+                {
+                    // Mass flow rate across the boundary in kg/s
+                    // omega * area / g = kg/s
+                    // (vNorm * omega) = dot product of velocity with boundary normal
+                    // Lower boundary first: negative omega -> mass flow into domain
+                    vNorm = -1.0;
+                    massFlux =  dt * (vNorm * PressureVelocityXY[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    massFluxes[iFace] = Math.Max(0.0,massFlux);
+
+                    // Now the upper boundary: positive omega -> mass flow into domain
+                    vNorm = +1.0;
+                    massFlux = dt * (vNorm * PressureVelocityXY[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    massFluxes[iFace + nFaces] = Math.Max(0.0,massFlux);
+                    iFace++;
+                }
+            }
+
+            // We now know the total mass flux - use to figure out weightings
+            massFlux = massFluxes.Sum();
+            weighting = new double[nFaces*2];
+            for (int i=0; i<(nFaces*2); i++)
+            {
+                // Cumulative
+                weighting[i] = (massFluxes[i] / massFlux);
+                if (i>0)
+                {
+                    weighting[i] += weighting[i-1];
+                }
+            }
+            // Force to 1.0 to ensure we don't accidentally miss anything
+            weighting[(nFaces*2)-1] = 1.0;
+
+            // How many points will we add (add mass surplus)?
+            nPoints = (massFlux + massSurplus)/kgPerPoint;
+            int nPointsTotal = (int)Math.Floor(nPoints);
+
+            // Unused mass
+            massSurplus = (nPoints - (double)nPointsTotal) * kgPerPoint;
+
+            //Console.WriteLine($"Expecting {nPointsTotal} new points");
+            double[] xVals = new double[nPointsTotal];
+            double[] yVals = new double[nPointsTotal];
+            double[] pressureVals = new double[nPointsTotal];
+            int iCell, iCellOneFace, iX, iY;
+            double pVal, xVal, yVal;
+            for (int iPoint=0; iPoint < nPointsTotal; iPoint++)
+            {
+                xVal = RNG.NextDouble();
+                yVal = RNG.NextDouble();
+                randomVal = RNG.NextDouble();
+                iCell = 0;
+                while (weighting[iCell] < randomVal)
+                {
+                    iCell++;
+                }
+                // First N are lower boundary; second N are upper boundary
+                if (iCell < nFaces)
+                {
+                    pVal = PBase - smallDelta;
+                }
+                else
+                {
+                    pVal = PCeiling + smallDelta;
+                }
+                iCellOneFace = iCell % nFaces;
+
+                // Iterate over Y internally, X externally in weight-setting loop
+                iY = iCellOneFace%NY;
+                iX = (int)Math.Floor((double)(iCellOneFace - iY)/(double)NY);
+                //Console.WriteLine($"{iCellOneFace,5:d} --> {iX,4:d}/{NX,4:d}, {iY,4:d}/{NY,4:d}");
+                xVals[iPoint] = (XMesh[iX]) + xVal * DX;
+                yVals[iPoint] = (YMesh[iY]) + yVal * DY;
+                pressureVals[iPoint] = pVal;
+            }
+            return (xVals, yVals, pressureVals, massSurplus);
+        }
+
         public (double[], double[], double[]) MapRandomToXYP( int nPoints, System.Random rng )
         {
             // Scatter randomly throughout domain
