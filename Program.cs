@@ -27,8 +27,8 @@ namespace LGTracer
 
             // Specify the domains
             double[] lonLims = [-80.0,15.0];
-            double[] latLims = [30.0,60.0];
-            int readLevel = 30;
+            double[] latLims = [10.0,60.0];
+            double[] pLims = [85000.0, 20000.0];
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
             string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.I3.05x0625.nc4";
@@ -48,21 +48,15 @@ namespace LGTracer
             // Read in MERRA-2 data and use that to set domain
             (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
             // Now read in the U and V data, as well as pressure velocities
-            (double[,]uWind, double[,]vWind, double[,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, readLevel, lonSet, latSet );
+            (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
             // Also read in PS, T, and QV
-            (double[,] surfacePressure, double[,]griddedTemperature, double[,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, readLevel, lonSet, latSet );
-
-            // These will be used more once we have 3D arrays - for now just impose these
-            // Approximate bounds of layer 30: 250 hPa, 200 hPa
-            double[] pLims = [25000.0, 20000.0];
+            (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
             
             // Set up the domain
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
 
             // Set up the domain meteorology
             domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
-
-            Console.WriteLine($"Total area: {domainManager.CellArea.Cast<double>().Sum()}");
 
             // Time handling
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
@@ -119,8 +113,9 @@ namespace LGTracer
                 */
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
-                (double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
-                pointManager.CreatePointSet(xSet, ySet, pSet);
+                // WARNING: This does not yet handle a vertical domain which is not uniform!
+                //(double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
+                //pointManager.CreatePointSet(xSet, ySet, pSet);
 
                 (double[] xSetV, double[] ySetV, double[] pSetV, massSurplus) = domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, massSurplus);
                 pointManager.CreatePointSet(xSetV, ySetV, pSetV);

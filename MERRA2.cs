@@ -93,7 +93,7 @@ namespace LGTracer
             return (lonEdge, latEdge, lonSet, latSet);
         }
 
-        public static (double[,], double[,], double[,] ) ReadA3( string fileName, int time, int level, int[] lonSet, int[] latSet )
+        public static (double[,,], double[,,], double[,,] ) ReadA3( string fileName, int time, int[] lonSet, int[] latSet )
         {
             // Returns [u],[v],[omega]
             // Open netCDF4 file
@@ -103,19 +103,20 @@ namespace LGTracer
                 OpenMode = ResourceOpenMode.ReadOnly
             };
 
-            double[,] u,v,w;
+            double[,,] u,v,w;
             int lonFirst = lonSet[0];
             int lonLast  = lonSet[1];
             int latFirst = latSet[0];
             int latLast  = latSet[1];
-            int nLon, nLat;
+            int nLon, nLat, nLev;
 
             nLon = 1 + (lonLast - lonFirst);
             nLat = 1 + (latLast - latFirst);
+            nLev = AP.Length - 1;
 
-            u = new double[nLat,nLon];
-            v = new double[nLat,nLon];
-            w = new double[nLat,nLon];
+            u = new double[nLev,nLat,nLon];
+            v = new double[nLev,nLat,nLon];
+            w = new double[nLev,nLat,nLon];
             
             using (DataSet ds = DataSet.Open(dsUri))
             {
@@ -128,9 +129,12 @@ namespace LGTracer
                 {
                     for (int iLat=0;iLat<nLat;iLat++)
                     {
-                        u[iLat,iLon] = (double)uFull[time,level,iLat + latFirst,iLon + lonFirst];
-                        v[iLat,iLon] = (double)vFull[time,level,iLat + latFirst,iLon + lonFirst];
-                        w[iLat,iLon] = (double)wFull[time,level,iLat + latFirst,iLon + lonFirst];
+                        for (int iLev=0;iLev<nLev;iLev++)
+                        {
+                            u[iLev,iLat,iLon] = (double)uFull[time,iLev,iLat + latFirst,iLon + lonFirst];
+                            v[iLev,iLat,iLon] = (double)vFull[time,iLev,iLat + latFirst,iLon + lonFirst];
+                            w[iLev,iLat,iLon] = (double)wFull[time,iLev,iLat + latFirst,iLon + lonFirst];
+                        }
                     }
                 }
             }
@@ -138,7 +142,7 @@ namespace LGTracer
             return (u, v, w);
         }
 
-        public static (double[,], double[,], double[,] ) ReadI3( string fileName, int time, int level, int[] lonSet, int[] latSet )
+        public static (double[,], double[,,], double[,,] ) ReadI3( string fileName, int time, int[] lonSet, int[] latSet )
         {
             // Returns PS, T, QV
             // Open netCDF4 file
@@ -152,14 +156,15 @@ namespace LGTracer
             int lonLast  = lonSet[1];
             int latFirst = latSet[0];
             int latLast  = latSet[1];
-            int nLon, nLat;
+            int nLon, nLat, nLev;
 
             nLon = 1 + (lonLast - lonFirst);
             nLat = 1 + (latLast - latFirst);
+            nLev = AP.Length - 1;
 
             double[,] ps = new double[nLat,nLon];
-            double[,] temperature = new double[nLat,nLon];
-            double[,] qv = new double[nLat,nLon];
+            double[,,] temperature = new double[nLev,nLat,nLon];
+            double[,,] qv = new double[nLev,nLat,nLon];
             
             using (DataSet ds = DataSet.Open(dsUri))
             {
@@ -172,9 +177,12 @@ namespace LGTracer
                 {
                     for (int iLat=0;iLat<nLat;iLat++)
                     {
-                        ps[iLat,iLon]          = (double)psFull[time,iLat + latFirst,iLon + lonFirst];
-                        temperature[iLat,iLon] = (double)temperatureFull[time,level,iLat + latFirst,iLon + lonFirst];
-                        qv[iLat,iLon]          = (double)qvFull[time,level,iLat + latFirst,iLon + lonFirst];
+                        ps[iLat,iLon] = (double)psFull[time,iLat + latFirst,iLon + lonFirst];
+                        for (int iLev=0;iLev<nLev;iLev++)
+                        {
+                            temperature[iLev,iLat,iLon] = (double)temperatureFull[time,iLev,iLat + latFirst,iLon + lonFirst];
+                            qv[iLev,iLat,iLon]          = (double)qvFull[time,iLev,iLat + latFirst,iLon + lonFirst];
+                        }
                     }
                 }
             }

@@ -64,13 +64,19 @@ namespace LGTracer
         public Vector2[] BoundaryPosts
         { get; protected set; }
 
-        public double[,] XSpeedXY
+        public double[,,] XSpeedXYP
         { get; protected set; }
 
-        public double[,] YSpeedXY
+        public double[,,] YSpeedXYP
         { get; protected set; }
         
-        public double[,] PressureVelocityXY
+        public double[,,] PressureVelocityXYP
+        { get; protected set; }
+
+        public double[,] PressureVelocityXYBase
+        { get; protected set; }
+
+        public double[,] PressureVelocityXYCeiling
         { get; protected set; }
 
         public double[,] SurfacePressureXY
@@ -79,10 +85,10 @@ namespace LGTracer
         public double[,,] PressureEdgeXYPe
         { get; protected set; }
 
-        public double[,] TemperatureXY
+        public double[,,] TemperatureXYP
         { get; protected set; }
 
-        public double[,] SpecificHumidityXY
+        public double[,,] SpecificHumidityXYP
         { get; protected set; }
 
         public double PBase
@@ -103,13 +109,15 @@ namespace LGTracer
         public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors)
         {
             // Set up the vertical coordinates
+            // NB: PBase and PCeiling indicate where we cull, not the vertical
+            // extent of the meteorological data
             PBase = pLimits[0];
             PCeiling = pLimits[1];
 
             // Set up the factors needed to calculate pressure edges
             AP = pOffsets;
             BP = pFactors;
-            NLevels = AP.Length + 1;
+            NLevels = AP.Length - 1;
 
             // Set up the mesh (units of degrees)
             // The original lon/lat limits aren't important - need the mesh limits
@@ -191,13 +199,15 @@ namespace LGTracer
             CreateBoundary();
 
             // Set up the meteorological data
-            XSpeedXY = new double[NY,NX];
-            YSpeedXY = new double[NY,NX];
+            XSpeedXYP = new double[NLevels,NY,NX];
+            YSpeedXYP = new double[NLevels,NY,NX];
             SurfacePressureXY = new double[NY,NX];
             PressureEdgeXYPe = new double[NLevels+1,NY,NX];
-            PressureVelocityXY = new double[NY,NX];
-            TemperatureXY = new double[NY,NX];
-            SpecificHumidityXY = new double[NY,NX];
+            PressureVelocityXYP = new double[NLevels,NY,NX];
+            TemperatureXYP = new double[NLevels,NY,NX];
+            SpecificHumidityXYP = new double[NLevels,NY,NX];
+            PressureVelocityXYBase = new double[NY,NX];
+            PressureVelocityXYCeiling = new double[NY,NX];
         }
 
         [MemberNotNull(nameof(CellArea))]
@@ -225,22 +235,57 @@ namespace LGTracer
             }
         }
 
-        public void UpdateMeteorology( double[,] surfacePressure, double[,] xSpeed, double[,] ySpeed, double[,] omega, double[,] temperature, double[,] specificHumidity )
+        public void UpdateMeteorology( double[,] surfacePressure, double[,,] xSpeed, double[,,] ySpeed, double[,,] omega, double[,,] temperature, double[,,] specificHumidity )
         {
+            // Update stored meteorology and derived quantities
+            int kBase, kCeiling;
             for (int i=0; i<NX; i++)
             {
                 for (int j=0; j<NY; j++)
                 {
                     SurfacePressureXY[j,i] = surfacePressure[j,i];
-                    XSpeedXY[j,i] = xSpeed[j,i];
-                    YSpeedXY[j,i] = ySpeed[j,i];
-                    PressureVelocityXY[j,i] = omega[j,i];
-                    TemperatureXY[j,i] = temperature[j,i];
-                    SpecificHumidityXY[j,i] = specificHumidity[j,i];
+                    for (int k=0; k<NLevels; k++)
+                    {
+                        XSpeedXYP[k,j,i] = xSpeed[k,j,i];
+                        YSpeedXYP[k,j,i] = ySpeed[k,j,i];
+                        PressureVelocityXYP[k,j,i] = omega[k,j,i];
+                        TemperatureXYP[k,j,i] = temperature[k,j,i];
+                        SpecificHumidityXYP[k,j,i] = specificHumidity[k,j,i];
+                    }
                 }
             }
+
             // Get the pressure edges too
             PressureEdgeXYPe = CalculatePressures(SurfacePressureXY);
+
+            // Find the level which corresponds to the base and ceiling of the domain
+            for (int i=0; i<NX; i++)
+            {
+                for (int j=0; j<NY; j++)
+                {
+                    kBase = -1;
+                    kCeiling = -1;
+                    for (int k=0; k<NLevels; k++)
+                    {
+                        // If next edge would be above (at lower pressure) than
+                        // the base pressure, we have found the lower bound
+                        if (kBase < 0 && PressureEdgeXYPe[k+1,j,i] < PBase)
+                        {
+                            kBase = k;
+                            // Set base quantities
+                            PressureVelocityXYBase[j,i] = PressureVelocityXYP[kBase,j,i];
+                        }
+                        if (kCeiling < 0 && PressureEdgeXYPe[k+1,j,i] < PCeiling)
+                        {
+                            kCeiling = k;
+                            // Set ceiling quantities
+                            PressureVelocityXYCeiling[j,i] = PressureVelocityXYP[kCeiling,j,i];
+                            // Since kCeiling > kBase, we don't need to keep going
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         public (double, double, double) VelocityFromFixedSpaceArray( double x, double y, double pressure, bool noConvert=false)
@@ -248,9 +293,9 @@ namespace LGTracer
             // Extract the velocity vector from an array
             // Values in m/s
             // Inefficient as we repeat the neighbor calculation
-            double dxdt = NearestNeighbor(x,y,pressure,XSpeedXY);
-            double dydt = NearestNeighbor(x,y,pressure,YSpeedXY);
-            double dpdt = NearestNeighbor(x,y,pressure,PressureVelocityXY);
+            double dxdt = NearestNeighbor3D(x,y,pressure,XSpeedXYP);
+            double dydt = NearestNeighbor3D(x,y,pressure,YSpeedXYP);
+            double dpdt = NearestNeighbor3D(x,y,pressure,PressureVelocityXYP);
             //double dpdt = 0.0;
             if (noConvert)
             {
@@ -263,7 +308,7 @@ namespace LGTracer
             return (dxdt, dydt, dpdt);
         }
 
-        public double NearestNeighbor( double x, double y, double pressure, double[,] valueArray)
+        public double NearestNeighbor2D( double x, double y, double[,] valueArray)
         {
             // Ignore pressure for now
             // Extract the velocity vector from an array
@@ -273,6 +318,23 @@ namespace LGTracer
 
             // Values in m/s
             return valueArray[yIndex,xIndex];
+        }
+
+        public double NearestNeighbor3D( double x, double y, double pressure, double[,,] valueArray)
+        {
+            // Ignore pressure for now
+            // Extract the velocity vector from an array
+            // Assumes constant X spacing and constant Y spacing
+            int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DX)),NX-1);
+            int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - YMin)/DY)),NY-1);
+            // Need to search through the pressure edges at this location
+            double ps = SurfacePressureXY[yIndex,xIndex];
+            int pIndex = 0;
+            while (pressure < PressureEdgeXYPe[pIndex+1,yIndex,xIndex])
+            {
+                pIndex++;
+            }
+            return valueArray[pIndex,yIndex,xIndex];
         }
 
         [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals))]
@@ -463,12 +525,12 @@ namespace LGTracer
                     // (vNorm * omega) = dot product of velocity with boundary normal
                     // Lower boundary first: negative omega -> mass flow into domain
                     vNorm = -1.0;
-                    massFlux =  dt * (vNorm * PressureVelocityXY[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    massFlux =  dt * (vNorm * PressureVelocityXYBase[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
                     massFluxes[iFace] = Math.Max(0.0,massFlux);
 
                     // Now the upper boundary: positive omega -> mass flow into domain
                     vNorm = +1.0;
-                    massFlux = dt * (vNorm * PressureVelocityXY[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    massFlux = dt * (vNorm * PressureVelocityXYCeiling[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
                     massFluxes[iFace + nFaces] = Math.Max(0.0,massFlux);
                     iFace++;
                 }
@@ -562,8 +624,8 @@ namespace LGTracer
             // AP and surfacePressure must be in the same units
             int nY = surfacePressure.GetLength(0);
             int nX = surfacePressure.GetLength(1);
-            int nLevels = AP.Length;
-            double[,,] pressureEdges = new double[nLevels,nY,nX];
+            int nLevelEdges = AP.Length;
+            double[,,] pressureEdges = new double[nLevelEdges,nY,nX];
             double localPS;
             for (int i=0; i<nX; i++)
             {
@@ -572,7 +634,7 @@ namespace LGTracer
                     // Surface pressure
                     localPS = surfacePressure[j,i];
                     // Hybrid eta calculation
-                    for (int level=0; level<nLevels; level++)
+                    for (int level=0; level<nLevelEdges; level++)
                     {
                         pressureEdges[level,j,i] = (localPS * BP[level]) + AP[level];
                     }
