@@ -443,7 +443,6 @@ namespace LGTracer
             {
                 // Mass flow rate across the boundary in kg/s
                 vNorm = (double)Vector2.Dot(vBoundary[i],BoundaryNormals[i]);
-                //Console.WriteLine($"{i} -> {BoundaryLengths[i]}");
                 massFlux = dt * vNorm * BoundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
                 massFluxes[i] = Math.Max(0.0,massFlux);
             }
@@ -508,9 +507,8 @@ namespace LGTracer
             // Position along boundary for each cell is random
             int nFaces = NX * NY;
             double smallDelta = 1.0e-5; // This is now in pressure terms
-            double massFlux, cellFrac, randomVal;
+            double massFlux, randomVal;
             double nPoints;
-            Vector2 pointLocation;
             double vNorm;
             // Double because we will deal with upper and lower boundary together
             double[] massFluxes = new double[nFaces*2];

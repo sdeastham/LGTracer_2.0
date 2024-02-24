@@ -16,8 +16,8 @@ namespace LGTracer
     {
         private static void Main(string[] args)
         {
-            /* LGTracer is a very simple test code designed to simulate movement of points
-            through a simple 2D space under the influence of a constant wind field. */
+            /* LGTracer is designed to simulate movement of points
+            through space under the influence of a wind field. */
             Console.WriteLine("Initiating LGTracer program");
 
             // Number of Lagrangian points to track
@@ -85,7 +85,6 @@ namespace LGTracer
             //System.Random RNG = new SystemRandomSource(seed);
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            //Func<double, double, (double, double)> vCalc = (double x, double y) => domainManager.VelocityFromFixedSpaceArray(x,y,false);
             PointManager pointManager = new PointManager(nPoints,domainManager);
 
             // Scatter N points randomly over the domain
@@ -98,13 +97,9 @@ namespace LGTracer
             tStorage += dtStorage;
             int nStored = 1;
 
-            //int nNew, nAvailable;
-
             // We only add an integer number of points each time step
             // If the number of points to be added is non-integer, retain
             // the surplus and add it in at the next time step
-            //double nNewExact;
-            //double nSurplus = 0.0;
             double massSurplus = 0.0;
             
             // Set up timing
@@ -114,16 +109,6 @@ namespace LGTracer
             Console.WriteLine("Beginning trajectory calculation");
             for (int iter=0;iter<iterMax; iter++)
             {
-                // How many new points will we add (allowing for variable dt)?
-                /*
-                nNewExact = (pointRate * dt) + nSurplus;
-                nNew = (int) Math.Floor(nNewExact);
-                nSurplus = nNewExact - (double)nNew;
-
-                // We want to introduce nNew at the edge, but we can only go up to nInactive
-                nAvailable = Math.Min(pointManager.MaxPoints - pointManager.NActive,nNew);
-                */
-
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // WARNING: This does not yet handle a vertical domain which is not uniform!
                 //(double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
