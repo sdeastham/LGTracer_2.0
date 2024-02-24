@@ -18,7 +18,7 @@ namespace LGTracer
         {
             /* LGTracer is a very simple test code designed to simulate movement of points
             through a simple 2D space under the influence of a constant wind field. */
-            Console.WriteLine("Initiating simple LGTracer program");
+            Console.WriteLine("Initiating LGTracer program");
 
             // Number of Lagrangian points to track
             int nPoints = 100000;
@@ -39,7 +39,7 @@ namespace LGTracer
             // Tiny domain
             double[] lonLims = [-30.0,0.0];
             double[] latLims = [30.0,40.0];
-            double[] pLims = [40000.0, 20000.0];
+            double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
 
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
