@@ -110,9 +110,9 @@ namespace LGTracer
             for (int iter=0;iter<iterMax; iter++)
             {
                 // If we have enough points available, scatter them evenly over the edges of the domain
-                // WARNING: This does not yet handle a vertical domain which is not uniform!
-                //(double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
-                //pointManager.CreatePointSet(xSet, ySet, pSet);
+                // WARNING: In testing
+                (double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
+                pointManager.CreatePointSet(xSet, ySet, pSet);
 
                 (double[] xSetV, double[] ySetV, double[] pSetV, massSurplus) = domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, massSurplus);
                 pointManager.CreatePointSet(xSetV, ySetV, pSetV);
