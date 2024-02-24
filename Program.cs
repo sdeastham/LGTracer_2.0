@@ -26,9 +26,21 @@ namespace LGTracer
             bool debug = false;
 
             // Specify the domains
-            double[] lonLims = [-80.0,15.0];
-            double[] latLims = [10.0,60.0];
-            double[] pLims = [85000.0, 20000.0];
+            // Huge domain
+            //double[] lonLims = [-80.0,15.0];
+            //double[] latLims = [10.0,60.0];
+            //double[] pLims = [85000.0, 20000.0];
+
+            // Moderate domain
+            //double[] lonLims = [-80.0,15.0];
+            //double[] latLims = [10.0,60.0];
+            //double[] pLims = [85000.0, 20000.0];
+
+            // Tiny domain
+            double[] lonLims = [-30.0,0.0];
+            double[] latLims = [30.0,40.0];
+            double[] pLims = [40000.0, 20000.0];
+
             int readTime = 0;
             string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
             string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.I3.05x0625.nc4";
