@@ -73,10 +73,10 @@ namespace LGTracer
         public double[,,] PressureVelocityXYP
         { get; protected set; }
 
-        public double[,] PressureVelocityXYBase
+        public int[,] BaseLevel
         { get; protected set; }
 
-        public double[,] PressureVelocityXYCeiling
+        public int[,] CeilingLevel
         { get; protected set; }
 
         public double[,] SurfacePressureXY
@@ -206,8 +206,8 @@ namespace LGTracer
             PressureVelocityXYP = new double[NLevels,NY,NX];
             TemperatureXYP = new double[NLevels,NY,NX];
             SpecificHumidityXYP = new double[NLevels,NY,NX];
-            PressureVelocityXYBase = new double[NY,NX];
-            PressureVelocityXYCeiling = new double[NY,NX];
+            BaseLevel = new int[NY,NX];
+            CeilingLevel = new int[NY,NX];
         }
 
         [MemberNotNull(nameof(CellArea))]
@@ -273,13 +273,13 @@ namespace LGTracer
                         {
                             kBase = k;
                             // Set base quantities
-                            PressureVelocityXYBase[j,i] = PressureVelocityXYP[kBase,j,i];
+                            BaseLevel[j,i] = kBase;
                         }
                         if (kCeiling < 0 && PressureEdgeXYPe[k+1,j,i] < PCeiling)
                         {
                             kCeiling = k;
                             // Set ceiling quantities
-                            PressureVelocityXYCeiling[j,i] = PressureVelocityXYP[kCeiling,j,i];
+                            CeilingLevel[j,i] = kCeiling;
                             // Since kCeiling > kBase, we don't need to keep going
                             break;
                         }
@@ -423,6 +423,8 @@ namespace LGTracer
 
         public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
         {
+            // TODO: Calculate weights by going vertically from BaseLevel into CeilingLevel
+            // Use fractional overlap in pressure and then just calculate weights as before
             // Seed the domain boundaries proportional to mass flow rate
             // Position along boundary for each cell is random
             int nEdges = BoundaryPosts.Length - 1; // First post is duplicated as last post
@@ -516,6 +518,7 @@ namespace LGTracer
             double pressureDelta = PBase - PCeiling;
 
             int iFace = 0;
+            int k;
             for (int i=0; i<NX; i++)
             {
                 for (int j=0; j<NY; j++)
@@ -525,12 +528,14 @@ namespace LGTracer
                     // (vNorm * omega) = dot product of velocity with boundary normal
                     // Lower boundary first: negative omega -> mass flow into domain
                     vNorm = -1.0;
-                    massFlux =  dt * (vNorm * PressureVelocityXYBase[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    k = BaseLevel[j,i];
+                    massFlux =  dt * (vNorm * PressureVelocityXYP[k,j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
                     massFluxes[iFace] = Math.Max(0.0,massFlux);
 
                     // Now the upper boundary: positive omega -> mass flow into domain
                     vNorm = +1.0;
-                    massFlux = dt * (vNorm * PressureVelocityXYCeiling[j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
+                    k = CeilingLevel[j,i];
+                    massFlux = dt * (vNorm * PressureVelocityXYP[k,j,i]) * CellArea[j,i] / LGConstants.gravConstantSurface;
                     massFluxes[iFace + nFaces] = Math.Max(0.0,massFlux);
                     iFace++;
                 }
