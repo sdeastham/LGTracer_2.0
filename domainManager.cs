@@ -64,6 +64,9 @@ namespace LGTracer
         public Vector2[] BoundaryPosts
         { get; protected set; }
 
+        protected int[,] BoundaryFaceIndices
+        { get; set; }
+
         public double[,,] XSpeedXYP
         { get; protected set; }
 
@@ -337,7 +340,7 @@ namespace LGTracer
             return valueArray[pIndex,yIndex,xIndex];
         }
 
-        [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals))]
+        [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals),nameof(BoundaryFaceIndices))]
         private void CreateBoundary()
         {
             // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
@@ -356,33 +359,48 @@ namespace LGTracer
             }
 
             // Duplicate first post for convenience
-            int nPosts = xPosts + (yPosts-1) + (xPosts-1) + (yPosts-1);
+            int nPosts = (2*NX) + (2*NY) + 1;
             BoundaryPosts = new Vector2[nPosts];
+            BoundaryFaceIndices = new int[nPosts-1,2]; // Y, X
             int currPost = 0;
             // South boundary
-            for (int i=0; i<xPosts; i++)
+            for (int i=0; i<NX; i++)
             {
                 BoundaryPosts[currPost] = new Vector2(xMeshFloat[i],yMeshFloat[0]);
+                BoundaryFaceIndices[currPost,0] = 0;
+                BoundaryFaceIndices[currPost,1] = i;
                 currPost++;
             }
             // East boundary
-            for (int i=1; i<yPosts; i++)
+            for (int i=0; i<NY; i++)
             {
                 BoundaryPosts[currPost] = new Vector2(xMeshFloat[xPosts-1],yMeshFloat[i]);
+                BoundaryFaceIndices[currPost,0] = i;
+                BoundaryFaceIndices[currPost,1] = xPosts - 1;
                 currPost++;
             }
             // North boundary
-            for (int i=xPosts-2; i>=0; i--)
+            for (int i=0; i<NX; i++)
             {
-                BoundaryPosts[currPost] = new Vector2(xMeshFloat[i],yMeshFloat[yPosts-1]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[(xPosts-1)-i],yMeshFloat[yPosts-1]);
+                BoundaryFaceIndices[currPost,0] = yPosts - 1;
+                BoundaryFaceIndices[currPost,1] = i;
                 currPost++;
             }
-            // West boundary (assume closure - ie include a final post identical to the first)
-            for (int i=yPosts-2; i>=0; i--)
+            // West boundary
+            for (int i=0; i<NY; i++)
             {
-                BoundaryPosts[currPost] = new Vector2(xMeshFloat[0],yMeshFloat[i]);
+                BoundaryPosts[currPost] = new Vector2(xMeshFloat[0],yMeshFloat[(yPosts-1)-i]);
+                BoundaryFaceIndices[currPost,0] = i;
+                BoundaryFaceIndices[currPost,1] = 0;
                 currPost++;
             }
+            // Assume closure - ie include a final post identical to the first
+            if (currPost != (nPosts - 1))
+            {
+                throw new InvalidOperationException($"Final post currPost ({currPost}) != nPosts-1 ({nPosts-1})");
+            }
+            BoundaryPosts[currPost] = BoundaryPosts[0];
             
             // Now calculate the boundary normals
             // First and last posts are duplicates for convenience
@@ -402,23 +420,45 @@ namespace LGTracer
             }
         }
 
-        public Vector2[] GetBoundaryVelocities()
+        public (Vector2[][], double[], int) GetBoundaryVelocities()
         {
             // u,v velocities at the cell edges
-            int nCells = BoundaryPosts.Length - 1;
+            int nEdges = BoundaryPosts.Length - 1;
             double u, v, w, x, y, pressure;
             Vector2 xyMid;
-            Vector2[] vBoundary = new Vector2[nCells];
-            for (int i=0; i<nCells; i++)
+            Vector2[][] vBoundary = new Vector2[nEdges][];
+            int nFaces = 0;
+            int k;
+            int[] kBase = new int[nEdges];
+            int [] kCeiling = new int[nEdges];
+            double pLower, pUpper;
+            int iX, iY;
+            for (int i=0; i<nEdges; i++)
             {
+                // How many faces are within our pressure limits?
+                k = 0;
+                kBase[i] = -1;
+                kCeiling[i] = -1;
+                iY = BoundaryFaceIndices[i,0];
+                iX = BoundaryFaceIndices[i,1];
+                while (kBase[i] < 0 && kCeiling[i] < 0)
+                {
+                    pLower = PressureEdgeXYPe[k,iY,iX];
+                    nFaces++;
+                }
+            }
+            double [] faceAreas = new double[nFaces];
+            for (int i=0; i<nEdges; i++)
+            {
+                vBoundary[i] = new Vector2[1];
                 xyMid = BoundaryPosts[i] + (0.5f * (BoundaryPosts[i+1] - BoundaryPosts[i]));
                 x = (double)xyMid.X;
                 y = (double)xyMid.Y;
                 pressure = (PBase + PCeiling)/2.0;
                 (u, v, w) = VelocityFromFixedSpaceArray(x,y,pressure,true);
-                vBoundary[i] = new Vector2((float)u,(float)v);
+                vBoundary[i][0] = new Vector2((float)u,(float)v);
             }
-            return vBoundary;
+            return (vBoundary, faceAreas, nFaces);
         }
 
         public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
@@ -433,23 +473,26 @@ namespace LGTracer
             double nPoints;
             Vector2 pointLocation, boundaryVector;
             double vNorm;
-            double[] massFluxes = new double[nEdges];
-            double[] weighting;
-            double pressureDelta = PBase - PCeiling;
 
-            Vector2[] vBoundary = GetBoundaryVelocities();
+            // This now needs to be a jagged array because the number of layers can
+            // vary from edge to edge
+            (Vector2[][] vBoundary, double[] faceArea, int nFaces) = GetBoundaryVelocities();
 
-            for (int i=0; i<nEdges; i++)
+            double[] massFluxes = new double[nFaces];
+            double[] weighting = new double[nFaces];
+
+            for (int i=0; i<nFaces; i++)
             {
+                int iLevel = 0;
+                double pressureDelta = 1.0;
                 // Mass flow rate across the boundary in kg/s
-                vNorm = (double)Vector2.Dot(vBoundary[i],BoundaryNormals[i]);
+                vNorm = (double)Vector2.Dot(vBoundary[i][iLevel],BoundaryNormals[i]);
                 massFlux = dt * vNorm * BoundaryLengths[i] * pressureDelta / LGConstants.gravConstantSurface;
                 massFluxes[i] = Math.Max(0.0,massFlux);
             }
 
             // We now know the total mass flux - use to figure out weightings
             massFlux = massFluxes.Sum();
-            weighting = new double[nEdges];
             for (int i=0; i<nEdges; i++)
             {
                 // Cumulative
