@@ -147,6 +147,9 @@ namespace LGTracer
             Console.WriteLine("Beginning trajectory calculation");
             for (int iter=0;iter<iterMax; iter++)
             {
+                // Update meteorological data
+                I3File.AdvanceTime(currentDate);
+
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // WARNING: In testing
                 (double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
@@ -163,6 +166,7 @@ namespace LGTracer
 
                 nSteps++;
                 tCurr = (iter+1) * dt;
+                currentDate = currentDate.AddSeconds(dt);
 
                 // For diagnostics - must take place AFTER tCurr advances
                 // Only store data every dtStorage seconds. Use a small offset
