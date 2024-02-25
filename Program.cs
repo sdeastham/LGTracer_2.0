@@ -42,35 +42,40 @@ namespace LGTracer
             double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
 
             int readTime = 0;
-            string metFileNameA3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.A3dyn.05x0625.nc4";
-            string metFileNameI3 = "C:/Data/MERRA-2/2023/01/MERRA2.20230101.I3.05x0625.nc4";
+            string metFileTemplateA3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.05x0625.nc4";
+            string metFileTemplateI3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.05x0625.nc4";
             string outputFileName = "output.nc";
 
             // Major simulation settings
-            double nDays = 30.0; // Days to run
+            DateTime startDate = new DateTime(2023,1,1,0,0,0);
+            DateTime endDate   = new DateTime(2023,2,1,0,0,0);
             double dt = 60.0 * 5.0; // Time step in seconds
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
 
             // Point settings
-            double kgPerPoint = 2.0e12; // Air mass represented by a single point (mass flows are huge - but 1e11 seems very high? Total atm mass 5.1e18!)
+            double kgPerPoint = 5.0e11; // Air mass represented by a single point (mass flows are huge - but 1e11 seems very high? Total atm mass 5.1e18!)
 
 
             // CODE STARTS HERE
+            DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
 
             // Read in MERRA-2 data and use that to set domain
+            string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
+            string metFileNameI3 = string.Format(metFileTemplateI3,currentDate.Year,currentDate.Month,currentDate.Day);
             (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
-            // Now read in the U and V data, as well as pressure velocities
-            (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
-            // Also read in PS, T, and QV
-            (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
             
             // Set up the domain
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
 
             // Set up the domain meteorology
+            // Now read in the U and V data, as well as pressure velocities
+            (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
+            // Also read in PS, T, and QV
+            (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
             domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
 
             // Time handling
+            double nDays = (endDate - startDate).TotalDays; // Days to run
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
             double tStart = 0.0;
             double tStop = tStart + duration;
