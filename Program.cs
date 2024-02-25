@@ -10,6 +10,11 @@ using MathNet.Numerics.Interpolation;
 using MathNet.Numerics.Random;
 //using MathNet.Numerics.Distributions;
 
+// DURING TESTING ONLY
+using Microsoft.Research.Science.Data;
+using Microsoft.Research.Science.Data.Imperative;
+using Microsoft.Research.Science.Data.NetCDF4;
+
 namespace LGTracer
 {
     public class Program
@@ -48,7 +53,7 @@ namespace LGTracer
 
             // Major simulation settings
             DateTime startDate = new DateTime(2023,1,1,0,0,0);
-            DateTime endDate   = new DateTime(2023,2,1,0,0,0);
+            DateTime endDate   = new DateTime(2023,1,1,12,0,0);
             double dt = 60.0 * 5.0; // Time step in seconds
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
 
@@ -59,18 +64,19 @@ namespace LGTracer
             // CODE STARTS HERE
             DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
 
-            // Read in MERRA-2 data and use that to set domain
-            string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
-            string metFileNameI3 = string.Format(metFileTemplateI3,currentDate.Year,currentDate.Month,currentDate.Day);
-            (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
-            
             // Set up the domain
+            string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
+            (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
+
+            // Currently hard-coded to expect MERRA-2 data
+            //DomainManager.InitializeMeteorology(startDate,metFileTemplateA3,metFileTemplateI3);
 
             // Set up the domain meteorology
             // Now read in the U and V data, as well as pressure velocities
             (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
             // Also read in PS, T, and QV
+            string metFileNameI3 = string.Format(metFileTemplateI3,currentDate.Year,currentDate.Month,currentDate.Day);
             (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
             domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
 
@@ -82,6 +88,31 @@ namespace LGTracer
             double tCurr = tStart;
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
             double tStorage = tStart; // Next time that we want storage to occur
+
+            // TEMPORARY - FOR TESTING
+            /*
+            Console.WriteLine("Running test of met data handling");
+            var dsUri = new NetCDFUri
+            {
+                FileName = metFileNameI3,
+                OpenMode = ResourceOpenMode.ReadOnly
+            };
+            DataSet dsI3 = DataSet.Open(dsUri);
+            MetData2D PSData = new MetData2D("PS",new int[] {lonSet[0],lonSet[1]+1}, new int[] {latSet[0],latSet[1]+1},8);
+            // Two updates will be enough to get the data up to date
+            PSData.Update(dsI3);
+            PSData.Update(dsI3);
+            DateTime testDate = new DateTime(2023,1,1,0,0,0);
+            double PSBefore, PSAfter;
+            for (int i=0; i<8*3; i++)
+            {
+                PSBefore = PSData.CurrentData[0,0];
+                PSData.Update(dsI3);
+                PSAfter = PSData.CurrentData[0,0];
+                Console.WriteLine($"PS AT 0,0: {PSBefore,8:f2} -> {PSAfter,8:f2}");
+            }
+            Console.WriteLine("Test complete");
+            */
 
             // Central RNG for random point seeding
             System.Random RNG = SystemRandomSource.Default;
