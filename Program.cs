@@ -10,11 +10,6 @@ using MathNet.Numerics.Interpolation;
 using MathNet.Numerics.Random;
 //using MathNet.Numerics.Distributions;
 
-// DURING TESTING ONLY
-using Microsoft.Research.Science.Data;
-using Microsoft.Research.Science.Data.Imperative;
-using Microsoft.Research.Science.Data.NetCDF4;
-
 namespace LGTracer
 {
     public class Program
@@ -113,6 +108,13 @@ namespace LGTracer
             }
             Console.WriteLine("Test complete");
             */
+            // Use a 30 minute offset for the data
+            string[] vars2DI3 = {"PS"};
+            string[] vars3DI3 = {};
+            MetFile I3File = new MetFile(metFileTemplateI3,startDate,vars2DI3,vars3DI3,lonLims,latLims,0);
+            string[] vars2DA3 = {};
+            string[] vars3DA3 = {};
+            MetFile A3File = new MetFile(metFileTemplateA3,startDate,vars2DA3,vars3DA3,lonLims,latLims,-30*60);
 
             // Central RNG for random point seeding
             System.Random RNG = SystemRandomSource.Default;

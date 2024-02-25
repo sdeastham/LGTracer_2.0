@@ -78,7 +78,7 @@ namespace LGTracer
         {
             if (TimeIndex >= TimesPerFile)
             {
-                Console.WriteLine($"File read triggered");
+                //Console.WriteLine($"File read triggered");
                 TimeIndex = 1;
                 ReadData(ds);
             }
@@ -86,7 +86,7 @@ namespace LGTracer
             {
                 TimeIndex++;
             }
-            Console.WriteLine($"Time index set to {TimeIndex}");
+            //Console.WriteLine($"Time index set to {TimeIndex}");
         }
         protected override void ReadData(DataSet ds)
         {

@@ -109,6 +109,12 @@ namespace LGTracer
         public double[,] CellArea
         { get; protected set; }
 
+        protected DateTime LastMetUpdate
+        { get; set; }
+
+        protected DateTime NextMetUpdate
+        { get; set; }
+
         public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors)
         {
             // Set up the vertical coordinates
