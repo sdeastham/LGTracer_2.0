@@ -116,7 +116,7 @@ namespace LGTracer
             TimeVec = ParseFileTimes(timeUnits,timeInts,SecondOffset);
             // Philosophical question: who is handling all these boundaries? Feels like
             // this is the domain manager's job
-            if (firstRead || XBounds == null || YBounds == null)
+            if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
             {
                 // Set up the domain too
                 (XEdge, YEdge, XBounds, YBounds ) = ReadLatLon( DS, XLim, YLim );
