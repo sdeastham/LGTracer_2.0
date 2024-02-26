@@ -53,10 +53,21 @@ namespace LGTracer
                 metVar.Update(DS);
                 DataVariables2D.Add(metVar);
             }
-            AdvanceTime(firstTime);
+            /*
+            foreach (string varName in dataFields3D)
+            {
+                MetData3D metVar = new MetData3D(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                // Need to update twice to fill the initial data array
+                // and align to the first entry
+                metVar.Update(DS);
+                metVar.Update(DS);
+                DataVariables3D.Add(metVar);
+            }
+            */
+            AdvanceToTime(firstTime);
         }
 
-        public void AdvanceTime(DateTime newTime)
+        public void AdvanceToTime(DateTime newTime)
         {
             // Scan through the current times
             while (TimeVec[TimeIndex+1] < newTime)

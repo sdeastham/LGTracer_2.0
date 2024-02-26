@@ -29,22 +29,12 @@ namespace LGTracer
         public int NY
         { get; protected set; }
 
-        public abstract void Update(DataSet ds);
         protected abstract void ReadData(DataSet ds);
-    }
 
-    public class MetData2D : MetData
-    {
-        protected double[][,] FullData;
-        protected double[,] NextData
-        { get { return FullData[TimeIndex%TimesPerFile]; } }
-        protected double[,] PreviousData
-        { get { return FullData[(TimeIndex-1)%TimesPerFile]; } }
-        public double[,] CurrentData
-        { get { return PreviousData; } }
         protected double ScaleValue;
         protected double OffsetValue;
-        public MetData2D(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0)
+
+        protected MetData(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0)
         {
             // Bounds of domain to be read in
             XBounds = xBounds;
@@ -67,18 +57,12 @@ namespace LGTracer
             // entry in FullData relevant to NextData, it gets reset to 1 each time a new file is read in.
             // If TimeIndex hits N+1, a new read operation is required.
             TimeIndex = TimesPerFile; // Forces read on next update
-            // The first entry in FullData is always the final entry from the previous file
-            FullData = new double[TimesPerFile+1][,];
-            for (int i=0; i<=TimesPerFile; i++)
-            {
-                FullData[i] = new double[NY,NX];
-            }
         }
-        public override void Update(DataSet ds)
+
+        public void Update(DataSet ds)
         {
             if (TimeIndex >= TimesPerFile)
             {
-                //Console.WriteLine($"File read triggered");
                 TimeIndex = 1;
                 ReadData(ds);
             }
@@ -86,7 +70,26 @@ namespace LGTracer
             {
                 TimeIndex++;
             }
-            //Console.WriteLine($"Time index set to {TimeIndex}");
+        }
+    }
+
+    public class MetData2D : MetData
+    {
+        protected double[][,] FullData;
+        protected double[,] NextData
+        { get { return FullData[TimeIndex%TimesPerFile]; } }
+        protected double[,] PreviousData
+        { get { return FullData[(TimeIndex-1)%TimesPerFile]; } }
+        public double[,] CurrentData
+        { get { return PreviousData; } }
+
+        public MetData2D(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
+        {
+            FullData = new double[TimesPerFile+1][,];
+            for (int i=0; i<=TimesPerFile; i++)
+            {
+                FullData[i] = new double[NY,NX];
+            }
         }
         protected override void ReadData(DataSet ds)
         {

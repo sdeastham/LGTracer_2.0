@@ -44,6 +44,7 @@ namespace LGTracer
             int readTime = 0;
             string metFileTemplateA3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.05x0625.nc4";
             string metFileTemplateI3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.05x0625.nc4";
+            string metDir = "C:/Data/MERRA-2";
             string outputFileName = "output.nc";
 
             // Major simulation settings
@@ -109,12 +110,13 @@ namespace LGTracer
             Console.WriteLine("Test complete");
             */
             // Use a 30 minute offset for the data
-            string[] vars2DI3 = {"PS"};
-            string[] vars3DI3 = {};
-            MetFile I3File = new MetFile(metFileTemplateI3,startDate,vars2DI3,vars3DI3,lonLims,latLims,0);
-            string[] vars2DA3 = {};
-            string[] vars3DA3 = {};
-            MetFile A3File = new MetFile(metFileTemplateA3,startDate,vars2DA3,vars3DA3,lonLims,latLims,-30*60);
+            //string[] vars2DI3 = {"PS"};
+            //string[] vars3DI3 = {};
+            //MetFile I3File = new MetFile(metFileTemplateI3,startDate,vars2DI3,vars3DI3,lonLims,latLims,0);
+            //string[] vars2DA3 = {};
+            //string[] vars3DA3 = {};
+            //MetFile A3File = new MetFile(metFileTemplateA3,startDate,vars2DA3,vars3DA3,lonLims,latLims,-30*60);
+            MetManager meteorology = new MetManager(metDir,lonLims,latLims,startDate);
 
             // Central RNG for random point seeding
             System.Random RNG = SystemRandomSource.Default;
@@ -148,7 +150,7 @@ namespace LGTracer
             for (int iter=0;iter<iterMax; iter++)
             {
                 // Update meteorological data
-                I3File.AdvanceTime(currentDate);
+                meteorology.AdvanceToTime(currentDate);
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // WARNING: In testing
