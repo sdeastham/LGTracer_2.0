@@ -119,4 +119,58 @@ namespace LGTracer
             }
         }
     }
+
+    public class MetData3D : MetData
+    {
+        protected double[][,,] FullData;
+        protected double[,,] NextData
+        { get { return FullData[TimeIndex%TimesPerFile]; } }
+        protected double[,,] PreviousData
+        { get { return FullData[(TimeIndex-1)%TimesPerFile]; } }
+        public double[,,] CurrentData
+        { get { return PreviousData; } }
+
+        public int NZ
+        { get; protected set; }
+
+        public MetData3D(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
+        {
+            NZ = nLevels;
+            FullData = new double[TimesPerFile+1][,,];
+            for (int i=0; i<=TimesPerFile; i++)
+            {
+                FullData[i] = new double[NZ,NY,NX];
+            }
+        }
+        protected override void ReadData(DataSet ds)
+        {
+            // Reads in all time slices from the file
+            // Cycle the last entry of FullData back to the first
+            for (int i=0; i<NX; i++)
+            {
+                for (int j=0; j<NY; j++)
+                {
+                    for (int k=0; k<NZ; k++)
+                    {
+                        FullData[0][k,j,i] = FullData[TimesPerFile][k,j,i];
+                    }
+                }
+            }
+
+            float[,,,] rawData = ds.GetData<float[,,,]>(FieldName);
+            for (int t=0; t<TimesPerFile; t++)
+            {
+                for (int i=0; i<NX; i++)
+                {
+                    for (int j=0; j<NY; j++)
+                    {
+                        for (int k=0; k<NZ; k++)
+                        {
+                            FullData[t+1][k,j,i] = (rawData[t,k,j+YBounds[0],i+XBounds[0]] * ScaleValue) + OffsetValue;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

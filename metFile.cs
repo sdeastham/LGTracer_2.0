@@ -18,12 +18,13 @@ namespace LGTracer
         private string FileTemplate;
         private int SecondOffset; // Number of seconds to offset times which are read in
         public List<MetData2D> DataVariables2D
-        //public List<MetData3D> DataVariables3D
         { get; private set; }
-        private int[] XBounds;
-        private int[] YBounds;
-        private double[] XLim;
-        private double[] YLim;
+        public List<MetData3D> DataVariables3D
+        { get; private set; }
+        private int[] XBounds, YBounds;
+        private double[] XEdge, YEdge;
+        private double[] XLim, YLim;
+        private int NLevels;
         private int TimeIndex;
         private TimeSpan TimeDelta;
 
@@ -39,6 +40,7 @@ namespace LGTracer
             ReadFile(firstTime,true); // << Seems that this is not establishing DS?
             int nTimes = TimeVec.Length;
             DataVariables2D = [];
+            DataVariables3D = [];
             double scaleValue = 1.0;
             double offsetValue = 0.0;
             TimeIndex = 0;
@@ -53,17 +55,15 @@ namespace LGTracer
                 metVar.Update(DS);
                 DataVariables2D.Add(metVar);
             }
-            /*
             foreach (string varName in dataFields3D)
             {
-                MetData3D metVar = new MetData3D(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                MetData3D metVar = new MetData3D(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
                 metVar.Update(DS);
                 DataVariables3D.Add(metVar);
             }
-            */
             AdvanceToTime(firstTime);
         }
 
@@ -88,12 +88,10 @@ namespace LGTracer
                 {
                     metVar.Update(DS);
                 }
-                /*
                 foreach (MetData3D metVar in DataVariables3D)
                 {
                     metVar.Update(DS);
                 }
-                */
             }
         }
         private string FillTemplate(DateTime targetTime)
@@ -101,7 +99,7 @@ namespace LGTracer
             return string.Format(FileTemplate,targetTime.Year,targetTime.Month,targetTime.Day);
         }
 
-        [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds))]
+        [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds),nameof(XEdge),nameof(YEdge))]
         private void ReadFile(DateTime targetTime, bool firstRead)
         {
             string fileName = FillTemplate(targetTime);
@@ -121,7 +119,16 @@ namespace LGTracer
             if (firstRead || XBounds == null || YBounds == null)
             {
                 // Set up the domain too
-                (double[] lonEdge, double[] latEdge, XBounds, YBounds ) = ReadLatLon( DS, XLim, YLim );
+                (XEdge, YEdge, XBounds, YBounds ) = ReadLatLon( DS, XLim, YLim );
+                if (DS.Variables.Contains("lev"))
+                {
+                    float[] levels = DS.GetData<float[]>("lev");
+                    NLevels = levels.Length;
+                }
+                else
+                {
+                    NLevels = 0;
+                }
             }
         }
 
@@ -209,6 +216,10 @@ namespace LGTracer
             int[] lonSet = [lonFirst,lonLast+1];
             int[] latSet = [latFirst,latLast+1];
             return (lonEdge, latEdge, lonSet, latSet);
+        }
+        public (double[], double[]) GetXYMesh()
+        {
+            return (XEdge, YEdge);
         }
     }
 }

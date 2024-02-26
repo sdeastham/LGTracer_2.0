@@ -24,57 +24,61 @@ namespace LGTracer
             int nPoints = 100000;
             int nInitial = 1000; // Points to initially scatter randomly
             bool debug = false;
+            bool updateMeteorology = true; // Allow meteorology to update over time
+            bool seeded = true; // Use the same seed for all runs to guarantee meteorology
+            string outputFileName = "output_with_updates.nc";
 
             // Specify the domains
             // Huge domain
-            //double[] lonLims = [-80.0,15.0];
-            //double[] latLims = [10.0,60.0];
-            //double[] pLims = [85000.0, 20000.0];
+            double[] lonLims = [-80.0,15.0];
+            double[] latLims = [10.0,60.0];
+            double[] pLims = [85000.0, 20000.0];
+            double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Moderate domain
             //double[] lonLims = [-80.0,15.0];
             //double[] latLims = [10.0,60.0];
             //double[] pLims = [85000.0, 20000.0];
+            // double kgPerPoint = 1.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Tiny domain
-            double[] lonLims = [-30.0,0.0];
-            double[] latLims = [30.0,40.0];
-            double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
+            //double[] lonLims = [-30.0,0.0];
+            //double[] latLims = [30.0,40.0];
+            //double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
+            //double kgPerPoint = 5.0e11; // Air mass represented by a single point in kg (seems a bit off?)
 
-            int readTime = 0;
-            string metFileTemplateA3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.05x0625.nc4";
-            string metFileTemplateI3 = "C:/Data/MERRA-2/{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.05x0625.nc4";
             string metDir = "C:/Data/MERRA-2";
-            string outputFileName = "output.nc";
 
             // Major simulation settings
             DateTime startDate = new DateTime(2023,1,1,0,0,0);
-            DateTime endDate   = new DateTime(2023,1,1,12,0,0);
+            DateTime endDate   = new DateTime(2023,1,15,0,0,0);
             double dt = 60.0 * 5.0; // Time step in seconds
             double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
-
-            // Point settings
-            double kgPerPoint = 5.0e11; // Air mass represented by a single point (mass flows are huge - but 1e11 seems very high? Total atm mass 5.1e18!)
 
 
             // CODE STARTS HERE
             DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
 
             // Set up the domain
-            string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
-            (double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
+            //string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
+            //(double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
+            MetManager meteorology = new MetManager(metDir, lonLims, latLims, startDate);
+            (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
+            domainManager.UpdateMeteorologyFromManager(meteorology);
 
             // Currently hard-coded to expect MERRA-2 data
             //DomainManager.InitializeMeteorology(startDate,metFileTemplateA3,metFileTemplateI3);
 
             // Set up the domain meteorology
             // Now read in the U and V data, as well as pressure velocities
+            /*
             (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
             // Also read in PS, T, and QV
             string metFileNameI3 = string.Format(metFileTemplateI3,currentDate.Year,currentDate.Month,currentDate.Day);
             (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
             domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
+            */
 
             // Time handling
             double nDays = (endDate - startDate).TotalDays; // Days to run
@@ -85,44 +89,18 @@ namespace LGTracer
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
             double tStorage = tStart; // Next time that we want storage to occur
 
-            // TEMPORARY - FOR TESTING
-            /*
-            Console.WriteLine("Running test of met data handling");
-            var dsUri = new NetCDFUri
-            {
-                FileName = metFileNameI3,
-                OpenMode = ResourceOpenMode.ReadOnly
-            };
-            DataSet dsI3 = DataSet.Open(dsUri);
-            MetData2D PSData = new MetData2D("PS",new int[] {lonSet[0],lonSet[1]+1}, new int[] {latSet[0],latSet[1]+1},8);
-            // Two updates will be enough to get the data up to date
-            PSData.Update(dsI3);
-            PSData.Update(dsI3);
-            DateTime testDate = new DateTime(2023,1,1,0,0,0);
-            double PSBefore, PSAfter;
-            for (int i=0; i<8*3; i++)
-            {
-                PSBefore = PSData.CurrentData[0,0];
-                PSData.Update(dsI3);
-                PSAfter = PSData.CurrentData[0,0];
-                Console.WriteLine($"PS AT 0,0: {PSBefore,8:f2} -> {PSAfter,8:f2}");
-            }
-            Console.WriteLine("Test complete");
-            */
-            // Use a 30 minute offset for the data
-            //string[] vars2DI3 = {"PS"};
-            //string[] vars3DI3 = {};
-            //MetFile I3File = new MetFile(metFileTemplateI3,startDate,vars2DI3,vars3DI3,lonLims,latLims,0);
-            //string[] vars2DA3 = {};
-            //string[] vars3DA3 = {};
-            //MetFile A3File = new MetFile(metFileTemplateA3,startDate,vars2DA3,vars3DA3,lonLims,latLims,-30*60);
-            MetManager meteorology = new MetManager(metDir,lonLims,latLims,startDate);
-
             // Central RNG for random point seeding
-            System.Random RNG = SystemRandomSource.Default;
-            // Use this if debugging
-            //int seed = 31567891;
-            //System.Random RNG = new SystemRandomSource(seed);
+            System.Random RNG;
+            if (seeded)
+            {
+                // Use this if debugging
+                int seed = 31567891;
+                RNG = new SystemRandomSource(seed);
+            }
+            else
+            {
+                RNG = SystemRandomSource.Default;
+            }
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
             PointManager pointManager = new PointManager(nPoints,domainManager);
@@ -150,7 +128,11 @@ namespace LGTracer
             for (int iter=0;iter<iterMax; iter++)
             {
                 // Update meteorological data
-                meteorology.AdvanceToTime(currentDate);
+                if (updateMeteorology)
+                {
+                    meteorology.AdvanceToTime(currentDate);
+                    domainManager.UpdateMeteorologyFromManager(meteorology);
+                }
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // WARNING: In testing

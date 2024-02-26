@@ -244,6 +244,11 @@ namespace LGTracer
             }
         }
 
+        public void UpdateMeteorologyFromManager( MetManager meteorology )
+        {
+            UpdateMeteorology(meteorology.SurfacePressureXY, meteorology.UWindXYP, meteorology.VWindXYP, meteorology.PressureVelocityXYP, meteorology.TemperatureXYP, meteorology.SpecificHumidityXYP);
+        }
+        
         public void UpdateMeteorology( double[,] surfacePressure, double[,,] xSpeed, double[,,] ySpeed, double[,,] omega, double[,,] temperature, double[,,] specificHumidity )
         {
             // Update stored meteorology and derived quantities
