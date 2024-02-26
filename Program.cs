@@ -30,22 +30,22 @@ namespace LGTracer
 
             // Specify the domains
             // Huge domain
-            double[] lonLims = [-80.0,15.0];
-            double[] latLims = [10.0,60.0];
-            double[] pLims = [85000.0, 20000.0];
-            double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
+            //double[] lonLims = [-80.0,15.0];
+            //double[] latLims = [10.0,60.0];
+            //double[] pLims = [85000.0, 20000.0];
+            //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Moderate domain
             //double[] lonLims = [-80.0,15.0];
             //double[] latLims = [10.0,60.0];
             //double[] pLims = [85000.0, 20000.0];
-            // double kgPerPoint = 1.0e12; // Air mass represented by a single point in kg (seems a bit off?)
+            //double kgPerPoint = 1.0e14; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Tiny domain
-            //double[] lonLims = [-30.0,0.0];
-            //double[] latLims = [30.0,40.0];
-            //double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
-            //double kgPerPoint = 5.0e11; // Air mass represented by a single point in kg (seems a bit off?)
+            double[] lonLims = [-30.0,0.0];
+            double[] latLims = [30.0,40.0];
+            double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
+            double kgPerPoint = 5.0e11; // Air mass represented by a single point in kg (seems a bit off?)
 
             string metDir = "C:/Data/MERRA-2";
 
@@ -53,8 +53,8 @@ namespace LGTracer
             DateTime startDate = new DateTime(2023,1,1,0,0,0);
             DateTime endDate   = new DateTime(2023,1,15,0,0,0);
             double dt = 60.0 * 5.0; // Time step in seconds
-            double dtStorage = 60.0*15.0; // // How often to save out data (seconds)
-
+            double dtStorage = 60.0*15.0; // How often to save out data (seconds)
+            double dtReport = 60.0*60.0; // How often to report to the user?
 
             // CODE STARTS HERE
             DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
@@ -67,19 +67,6 @@ namespace LGTracer
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
             domainManager.UpdateMeteorologyFromManager(meteorology);
 
-            // Currently hard-coded to expect MERRA-2 data
-            //DomainManager.InitializeMeteorology(startDate,metFileTemplateA3,metFileTemplateI3);
-
-            // Set up the domain meteorology
-            // Now read in the U and V data, as well as pressure velocities
-            /*
-            (double[,,]uWind, double[,,]vWind, double[,,] pressureVelocity ) = MERRA2.ReadA3( metFileNameA3, readTime, lonSet, latSet );
-            // Also read in PS, T, and QV
-            string metFileNameI3 = string.Format(metFileTemplateI3,currentDate.Year,currentDate.Month,currentDate.Day);
-            (double[,] surfacePressure, double[,,]griddedTemperature, double[,,]griddedSpecificHumidity ) = MERRA2.ReadI3( metFileNameI3, readTime, lonSet, latSet );
-            domainManager.UpdateMeteorology(surfacePressure,uWind,vWind,pressureVelocity,griddedTemperature,griddedSpecificHumidity);
-            */
-
             // Time handling
             double nDays = (endDate - startDate).TotalDays; // Days to run
             double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
@@ -88,6 +75,7 @@ namespace LGTracer
             double tCurr = tStart;
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
             double tStorage = tStart; // Next time that we want storage to occur
+            double tReport = tStart; // Next time we want output to go to the user
 
             // Central RNG for random point seeding
             System.Random RNG;
@@ -114,6 +102,9 @@ namespace LGTracer
             pointManager.ArchiveConditions(tCurr);
             tStorage += dtStorage;
             int nStored = 1;
+
+            // Don't report at initialization
+            tReport += dtReport;
 
             // We only add an integer number of points each time step
             // If the number of points to be added is non-integer, retain
@@ -160,6 +151,11 @@ namespace LGTracer
                     pointManager.ArchiveConditions(tCurr);
                     tStorage += dtStorage;
                     nStored += 1;
+                }
+                if (tCurr >= (tReport - 1.0e-10))
+                {
+                    Console.WriteLine($" --> Time at end of time step: {currentDate}. Current point count: {pointManager.NActive,10:d}");
+                    tReport += dtReport;
                 }
             }
             watch.Stop();
