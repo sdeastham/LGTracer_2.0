@@ -101,7 +101,7 @@ namespace LGTracer
             return string.Format(FileTemplate,targetTime.Year,targetTime.Month,targetTime.Day);
         }
 
-        [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec))]
+        [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds))]
         private void ReadFile(DateTime targetTime, bool firstRead)
         {
             string fileName = FillTemplate(targetTime);
@@ -118,7 +118,7 @@ namespace LGTracer
             TimeVec = ParseFileTimes(timeUnits,timeInts,SecondOffset);
             // Philosophical question: who is handling all these boundaries? Feels like
             // this is the domain manager's job
-            if (firstRead)
+            if (firstRead || XBounds == null || YBounds == null)
             {
                 // Set up the domain too
                 (double[] lonEdge, double[] latEdge, XBounds, YBounds ) = ReadLatLon( DS, XLim, YLim );
@@ -149,7 +149,6 @@ namespace LGTracer
                     break;
                 default:
                     throw new ArgumentException($"Invalid time units {timeType} in string {units}");
-                    break;
             }
             string ymd = substrings[2];
             string hms = substrings[3];

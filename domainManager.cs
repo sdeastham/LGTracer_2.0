@@ -527,7 +527,7 @@ namespace LGTracer
             // Position along boundary for each cell is random
             int nEdges = BoundaryPosts.Length - 1; // First post is duplicated as last post
             double smallDelta = 1.0e-5;
-            double massFlux, cellFrac, randomVal;
+            double massFlux, randomVal;
             double nPoints;
             Vector2 pointLocation, boundaryVector;
             double vNorm;
