@@ -13,10 +13,10 @@ namespace LGTracer
 {
     public class PointManager
     {
-        public List<LGPoint> ActivePoints
+        public LinkedList<LGPoint> ActivePoints
         { get; private set; }
 
-        private List<LGPoint> InactivePoints
+        private LinkedList<LGPoint> InactivePoints
         { get; set; }
 
         private uint nextUID
@@ -25,16 +25,17 @@ namespace LGTracer
         private uint NextUID
         { get {nextUID += 1; return nextUID - 1;}}
 
-        public int NPoints
+        public long NPoints
         { get => NActive + NInactive; }
 
-        public int NActive
-        { get => ActivePoints.Count; }
+        // Handling this explicitly is more efficient than constantly taking LongCounts
+        public long NActive
+        { get; private set; }
 
-        public int NInactive
-        { get => InactivePoints.Count; }
+        public long NInactive
+        { get; private set; }
 
-        public int MaxPoints
+        public long MaxPoints
         { get; private set; }
 
         public Func<double, double, double, (double, double, double)> VelocityCalc
@@ -64,13 +65,13 @@ namespace LGTracer
         private List<double> TimeHistory
         { get; set; }
 
-        public int MaxStoredPoints
+        public long MaxStoredPoints
         { get; private set; }
 
         private bool Debug
         { get; set; }
 
-        public PointManager( int maxPoints, DomainManager domain, bool debug=false )
+        public PointManager( long maxPoints, DomainManager domain, bool debug=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
@@ -87,6 +88,8 @@ namespace LGTracer
 
             ActivePoints = [];
             InactivePoints = [];
+            NActive = 0;
+            NInactive = 0;
 
             // For output
             TimeHistory = [];
@@ -110,7 +113,8 @@ namespace LGTracer
             // Create a new point in the list
             // Start by creating an _inactive_ point
             LGPoint point = new LGPoint(VelocityCalc);
-            InactivePoints.Add(point);
+            InactivePoints.AddLast(point);
+            NInactive++;
             // Activate a point (doesn't matter if it's the same one) and return it
             return ActivatePoint(x,y,pressure);
         }
@@ -118,13 +122,16 @@ namespace LGTracer
         private LGPoint ActivatePoint( double x, double y, double pressure )
         {
             // Reactivate the first available dormant point and assign it a new UID
-            LGPoint point = InactivePoints[0];
-            ActivePoints.Add(point);
-            InactivePoints.RemoveAt(0);
+            LinkedListNode<LGPoint> node = InactivePoints.First;
+            LGPoint point = node.Value;
+            InactivePoints.Remove(node);
+            ActivePoints.AddLast(node);
 
             // Give the point its location and a new UID
             // Requesting the UID will automatically increment it
             point.Activate(x,y,pressure,NextUID);
+            NInactive--;
+            NActive++;
             return point;
         }
 
@@ -160,19 +167,21 @@ namespace LGTracer
             return point;
         }
 
-        public void DeactivatePoint( int index )
+        public void DeactivatePoint( LinkedListNode<LGPoint> node )
         {
             // Deactivate point i of those present in ActivePoints
-            LGPoint point = ActivePoints[index];
-            InactivePoints.Add(point);
+            LGPoint point = node.Value;
             point.Deactivate();
-            ActivePoints.RemoveAt(index);
+            ActivePoints.Remove(node);
+            InactivePoints.AddLast(node);
+            NInactive++;
+            NActive--;
         }
 
         public void CreatePointSet( double[] x, double[] y, double[] pressure )
         {
             // Create multiple points
-            for (int i=0; i<x.Length; i++)
+            for (long i=0; i<x.Length; i++)
             {
                 NextPoint(x[i],y[i],pressure[i]);
             }
@@ -181,35 +190,27 @@ namespace LGTracer
         public void Advance( double dt )
         {
             // Advances all active points one time step
-            //Console.WriteLine("ADVANCING");
             foreach (LGPoint point in ActivePoints)
             {
-                //Console.WriteLine($"{point.UID,5:d}: {point.X,7:f2}/{point.Y,7:f2}");
-                //double oldP = point.Pressure;
                 point.Advance(dt);
-                //double newP = point.Pressure;
-                //Console.WriteLine($"{point.UID,5:d}: {oldP,6:f2} -> {newP,6:f2}");
             }
         }
 
         public void Cull()
         {
             // Deactivate any points which are outside the domain
-            // Could also do this with LINQ
-            //Console.WriteLine("CULLING");
-            for (int i=NActive-1; i>=0; i--)
+            LinkedListNode<LGPoint> node = ActivePoints.First;
+            LinkedListNode<LGPoint> nextNode;
+            // The structure below is necessary because we can't get the next node from a deactivated node
+            while (node != null)
             {
-                LGPoint point = ActivePoints[i];
+                nextNode = node.Next;
+                LGPoint point = node.Value;
                 if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax || point.Pressure > Domain.PBase || point.Pressure < Domain.PCeiling )
                 {
-                    /*
-                    if (point.Age < 1800.0)
-                    {
-                        Console.WriteLine($"{point.UID,5:d}: {point.X,6:f2}/{point.Y,6:f2}, {point.Pressure,6:f1}");
-                    }
-                    */
-                    DeactivatePoint(i);
+                    DeactivatePoint(node);
                 }
+                node = nextNode;
             }
         }
 
@@ -225,11 +226,11 @@ namespace LGTracer
             };
 
             // Get the output sizes
-            int nPoints = MaxStoredPoints;//Math.Min(MaxStoredPoints,XHistory[0].Length);
+            long nPoints = MaxStoredPoints;//Math.Min(MaxStoredPoints,XHistory[0].Length);
             int nTimes = TimeHistory.Count;
 
-            int[] index = new int[nPoints];
-            for (int i=0; i<nPoints; i++ )
+            long[] index = new long[nPoints];
+            for (long i=0; i<nPoints; i++ )
             {
                 index[i] = i;
             }
@@ -288,22 +289,23 @@ namespace LGTracer
         public void ArchiveConditions(double tCurr)
         {
             MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
-            int nPoints = NActive;
+            long nPoints = NActive;
             double[] xPoints                = new double[nPoints];
             double[] yPoints                = new double[nPoints];
             double[] pressurePoints         = new double[nPoints];
             double[] temperaturePoints      = new double[nPoints];
             double[] specificHumidityPoints = new double[nPoints];
             uint[] UIDs = new uint[nPoints];
-            for (int i=0; i<nPoints; i++)
+            long i=0;
+            foreach (LGPoint point in ActivePoints)
             {
-                LGPoint point = ActivePoints[i];
                 xPoints[i] = point.X;
                 yPoints[i] = point.Y;
                 pressurePoints[i] = point.Pressure;
                 temperaturePoints[i] = point.Temperature;
                 specificHumidityPoints[i] = point.SpecificHumidity;
                 UIDs[i] = point.UID;
+                i++;
             }
             TimeHistory.Add(tCurr);
             XHistory.Add(xPoints);

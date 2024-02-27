@@ -21,8 +21,8 @@ namespace LGTracer
             Console.WriteLine("Initiating LGTracer program");
 
             // Number of Lagrangian points to track
-            int nPoints = 100000;
-            int nInitial = 1000; // Points to initially scatter randomly
+            long nPoints = 100000;
+            long nInitial = 1000; // Points to initially scatter randomly
             bool debug = false;
             bool updateMeteorology = true; // Allow meteorology to update over time
             bool seeded = true; // Use the same seed for all runs to guarantee meteorology
@@ -45,7 +45,7 @@ namespace LGTracer
             double[] lonLims = [-30.0,0.0];
             double[] latLims = [30.0,40.0];
             double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
-            double kgPerPoint = 5.0e11; // Air mass represented by a single point in kg (seems a bit off?)
+            double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             string metDir = "C:/Data/MERRA-2";
 

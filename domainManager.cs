@@ -703,7 +703,7 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[], double[]) MapRandomToXYP( int nPoints, System.Random rng )
+        public (double[], double[], double[]) MapRandomToXYP( long nPoints, System.Random rng )
         {
             // Scatter randomly throughout domain
             double xSpan = XMax - XMin;
@@ -716,7 +716,7 @@ namespace LGTracer
             double[] xInitial = new double[nPoints];
             double[] yInitial = new double[nPoints];
             double[] pressureInitial = new double[nPoints];
-            for (int i=0; i<nPoints; i++)
+            for (long i=0; i<nPoints; i++)
             {
                 xInitial[i] = rng.NextDouble()*xSpan + xStart;
                 yInitial[i] = rng.NextDouble()*ySpan + yStart;
