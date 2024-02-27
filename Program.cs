@@ -24,9 +24,17 @@ namespace LGTracer
             long nPoints = 100000;
             long nInitial = 1000; // Points to initially scatter randomly
             bool debug = false;
-            bool updateMeteorology = true; // Allow meteorology to update over time
+            bool updateMeteorology = false; // Allow meteorology to update over time
             bool seeded = true; // Use the same seed for all runs to guarantee meteorology
-            string outputFileName = "output_with_updates.nc";
+            string outputFileName;
+            if (updateMeteorology)
+            {
+                outputFileName = "output_with_updates.nc";
+            }
+            else
+            {
+                outputFileName = "output_fixed_met.nc";
+            }
 
             // Specify the domains
             // Huge domain
@@ -36,16 +44,16 @@ namespace LGTracer
             //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Moderate domain
-            //double[] lonLims = [-80.0,15.0];
-            //double[] latLims = [10.0,60.0];
-            //double[] pLims = [85000.0, 20000.0];
-            //double kgPerPoint = 1.0e14; // Air mass represented by a single point in kg (seems a bit off?)
+            double[] lonLims = [-80.0,15.0];
+            double[] latLims = [10.0,60.0];
+            double[] pLims = [85000.0, 20000.0];
+            double kgPerPoint = 1.0e13; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Tiny domain
-            double[] lonLims = [-30.0,0.0];
-            double[] latLims = [30.0,40.0];
-            double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
-            double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
+            //double[] lonLims = [-30.0,0.0];
+            //double[] latLims = [30.0,40.0];
+            //double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
+            //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
             string metDir = "C:/Data/MERRA-2";
 
