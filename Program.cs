@@ -24,17 +24,27 @@ namespace LGTracer
             long nPoints = 100000;
             long nInitial = 1000; // Points to initially scatter randomly
             bool debug = false;
+            bool includeCompression = true; // Calculate delta T due to pressure change?
             bool updateMeteorology = false; // Allow meteorology to update over time
             bool seeded = true; // Use the same seed for all runs to guarantee meteorology
-            string outputFileName;
+            string metOption, compressionOption;
             if (updateMeteorology)
             {
-                outputFileName = "output_with_updates.nc";
+                metOption = "dynamicMet";
             }
             else
             {
-                outputFileName = "output_fixed_met.nc";
+                metOption = "fixedMet";
             }
+            if (includeCompression)
+            {
+                compressionOption = "variableT";
+            }
+            else
+            {
+                compressionOption = "fixedT";
+            }
+            string outputFileName = $"output_{metOption}_{compressionOption}.nc";
 
             // Specify the domains
             // Huge domain
@@ -99,7 +109,7 @@ namespace LGTracer
             }
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            PointManager pointManager = new PointManager(nPoints,domainManager);
+            PointManager pointManager = new PointManager(nPoints,domainManager,includeCompression=includeCompression);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(nInitial,RNG);

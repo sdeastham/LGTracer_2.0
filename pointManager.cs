@@ -44,34 +44,29 @@ namespace LGTracer
         public DomainManager Domain
         { get; protected set; }
 
-        private List<double[]> XHistory
-        { get; set; }
+        private List<double[]> XHistory;
 
-        private List<double[]> YHistory
-        { get; set; }
+        private List<double[]> YHistory;
 
-        private List<double[]> PressureHistory
-        { get; set; }
+        private List<double[]> PressureHistory;
 
-        private List<double[]> TemperatureHistory
-        { get; set; }
+        private List<double[]> TemperatureHistory;
 
-        private List<double[]> SpecificHumidityHistory
-        { get; set; }
+        private List<double[]> SpecificHumidityHistory;
 
-        private List<uint[]> UIDHistory
-        { get; set; }
+        private List<uint[]> UIDHistory;
 
-        private List<double> TimeHistory
-        { get; set; }
+        private List<double> TimeHistory;
 
         public long MaxStoredPoints
         { get; private set; }
 
-        private bool Debug
-        { get; set; }
+        private bool Debug;
 
-        public PointManager( long maxPoints, DomainManager domain, bool debug=false )
+        // Do we calculate the effect of compression on temperature?
+        private bool IncludeCompression;
+
+        public PointManager( long maxPoints, DomainManager domain, bool debug=false, bool includeCompression=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
@@ -79,6 +74,9 @@ namespace LGTracer
             // Set the velocity calculation
             Func<double, double, double, (double, double, double)> vCalc = (double x, double y, double pressure) => domain.VelocityFromFixedSpaceArray(x,y,pressure,false);
             VelocityCalc = vCalc;
+
+            // Are we calculating the effect of adiabatic compression?
+            IncludeCompression = includeCompression;
 
             // Limit on how many points can be managed
             MaxPoints = maxPoints;
@@ -112,7 +110,7 @@ namespace LGTracer
         {
             // Create a new point in the list
             // Start by creating an _inactive_ point
-            LGPoint point = new LGPoint(VelocityCalc);
+            LGPoint point = new LGPoint(VelocityCalc,IncludeCompression);
             InactivePoints.AddLast(point);
             NInactive++;
             // Activate a point (doesn't matter if it's the same one) and return it

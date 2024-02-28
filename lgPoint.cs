@@ -47,7 +47,11 @@ namespace LGTracer
             set => _location = new Vector3(_location.X,_location.Y,(float)value);
         }
 
-        public LGPoint( Func<double, double, double, (double, double, double)> vCalc )
+        private bool IncludeCompression;
+
+        public const double GammaRatio = 0.4/1.4;
+
+        public LGPoint( Func<double, double, double, (double, double, double)> vCalc, bool includeCompression = false )
         {
             // Point starts inactive
             this._location = new Vector3(float.NaN,float.NaN,float.NaN);
@@ -55,6 +59,8 @@ namespace LGTracer
             this.VelocityCalc = vCalc;
             // Set the rest of the properties by deactivating the point
             this.Deactivate();
+            // Do we want to calculate the effect of adiabatic compression on temperature?
+            this.IncludeCompression = includeCompression;
         }
 
         public void Activate( double x, double y, double pressure, uint uniqueID )
@@ -107,8 +113,15 @@ namespace LGTracer
             double pSpeed = (1.0/6.0) * (dp1 + 2.0*dp2 + 2.0*dp3 + dp4);
             X += xSpeed * dt;
             Y += ySpeed * dt;
-            Pressure += pSpeed * dt;
+            double oldPressure = Pressure;
+            double newPressure = oldPressure + (pSpeed * dt);
+            Pressure = newPressure;
             Age += dt;
+
+            if (IncludeCompression)
+            {
+                Temperature = Temperature * Math.Pow(newPressure/oldPressure,GammaRatio);
+            }
         }
 
     }
