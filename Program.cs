@@ -109,7 +109,7 @@ namespace LGTracer
             }
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            PointManager pointManager = new PointManager(nPoints,domainManager,includeCompression=includeCompression);
+            PointManager pointManager = new PointManager(nPoints,domainManager,includeCompression: includeCompression);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(nInitial,RNG);
