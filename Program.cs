@@ -1,14 +1,9 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Numerics;
-
-using MathNet.Numerics;
-using MathNet.Numerics.Interpolation;
-//using MathNet.Numerics.Integration;
+﻿using System.Diagnostics;
 using MathNet.Numerics.Random;
-//using MathNet.Numerics.Distributions;
+
+using YamlDotNet.RepresentationModel;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace LGTracer
 {
@@ -20,33 +15,22 @@ namespace LGTracer
             through space under the influence of a wind field. */
             Console.WriteLine("Initiating LGTracer program");
 
+            // Read in first argument as configuration file (or use default)
+            string configFile = "config.yaml";
+            if (args.Length > 0)
+            {
+                configFile = args[0];
+            }
+            LGOptions configOptions = ReadConfig(configFile);
+            
             // Number of Lagrangian points to track
-            const long nPoints = 100000;
-            const long nInitial = 1000; // Points to initially scatter randomly
-            const bool debug = false;
-            const bool includeCompression = true; // Calculate delta T due to pressure change?
-            const bool updateMeteorology = true; // Allow meteorology to update over time
-            const bool seeded = true; // Use the same seed for all runs to guarantee meteorology
-            
-            
-            string metOption, compressionOption;
-            if (updateMeteorology)
-            {
-                metOption = "dynamicMet";
-            }
-            else
-            {
-                metOption = "fixedMet";
-            }
-            if (includeCompression)
-            {
-                compressionOption = "variableT";
-            }
-            else
-            {
-                compressionOption = "fixedT";
-            }
-            string outputFileName = $"outputRider_{metOption}_{compressionOption}.nc";
+            long? maxPoints = configOptions.Points.Max;
+            long initialPointCount = configOptions.Points.Initial; // Points to initially scatter randomly
+            bool debug = configOptions.Debug;
+            bool includeCompression = configOptions.Points.AdiabaticCompression;
+            bool updateMeteorology = configOptions.TimeDependentMeteorology;
+            bool seeded = configOptions.Seed != null;
+            string outputFileName = configOptions.InputOutput.OutputFile;
 
             // Specify the domains
             // Huge domain
@@ -102,8 +86,7 @@ namespace LGTracer
             if (seeded)
             {
                 // Use this if debugging
-                int seed = 31567891;
-                RNG = new SystemRandomSource(seed);
+                RNG = new SystemRandomSource((int)configOptions.Seed);
             }
             else
             {
@@ -111,10 +94,10 @@ namespace LGTracer
             }
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            PointManager pointManager = new PointManager(nPoints,domainManager,includeCompression: includeCompression);
+            PointManager pointManager = new PointManager(maxPoints,domainManager,includeCompression: includeCompression);
 
             // Scatter N points randomly over the domain
-            (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(nInitial,RNG);
+            (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(initialPointCount,RNG);
             pointManager.CreatePointSet(xInitial,yInitial,pInitial);
 
             // Set up output
@@ -200,6 +183,16 @@ namespace LGTracer
             {
                 Console.WriteLine($"Could not write output to {outputFileName}");
             }
+        }
+
+        private static LGOptions ReadConfig(string filename)
+        {
+            string yaml = File.ReadAllText(filename);
+            var deserializer = new DeserializerBuilder()
+                .WithNamingConvention(HyphenatedNamingConvention.Instance)
+                .Build();
+
+            return deserializer.Deserialize<LGOptions>(yaml);
         }
     }
 }

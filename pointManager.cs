@@ -58,7 +58,7 @@ namespace LGTracer
         // Do we calculate the effect of compression on temperature?
         private bool IncludeCompression;
 
-        public PointManager( long maxPoints, DomainManager domain, bool debug=false, bool includeCompression=false )
+        public PointManager( long? maxPoints, DomainManager domain, bool debug=false, bool includeCompression=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
@@ -69,7 +69,15 @@ namespace LGTracer
             IncludeCompression = includeCompression;
 
             // Limit on how many points can be managed
-            MaxPoints = maxPoints;
+            if (maxPoints == null)
+            {
+                // No limit (danger!)
+                MaxPoints = long.MaxValue;
+            }
+            else
+            {
+                MaxPoints = (long)maxPoints;
+            }
 
             // Max number of points stored out in any single sample (diagnostic only)
             MaxStoredPoints = 0;
