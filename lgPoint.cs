@@ -26,6 +26,8 @@ namespace LGTracer
         public double SpecificHumidity
         { get; protected set; }
 
+        public double RelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, SpecificHumidity);
+
         public double Age
         { get; protected set; }
 
