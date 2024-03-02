@@ -239,7 +239,7 @@ namespace LGTracer
         public void UpdateMeteorology()
         {
             // Update derived quantities
-            PressureEdgeXYPe = CalculatePressures(SurfacePressureXY);
+            UpdatePressures();
 
             // Find the level which corresponds to the base and ceiling of the domain
             int kBase, kCeiling;
@@ -696,29 +696,26 @@ namespace LGTracer
             return (xInitial, yInitial, pressureInitial);
         }
 
-        public double[,,] CalculatePressures(double[,] surfacePressure)
+        public void UpdatePressures()
         {
             // Calculate pressures at grid cell edges given surface pressures
             // AP and surfacePressure must be in the same units
-            int nY = surfacePressure.GetLength(0);
-            int nX = surfacePressure.GetLength(1);
+            int nY = SurfacePressureXY.GetLength(0);
+            int nX = SurfacePressureXY.GetLength(1);
             int nLevelEdges = AP.Length;
-            double[,,] pressureEdges = new double[nLevelEdges,nY,nX];
-            double localPS;
             for (int i=0; i<nX; i++)
             {
                 for (int j=0; j<nY; j++)
                 {
                     // Surface pressure
-                    localPS = surfacePressure[j,i];
+                    double localSurfacePressure = SurfacePressureXY[j,i];
                     // Hybrid eta calculation
                     for (int level=0; level<nLevelEdges; level++)
                     {
-                        pressureEdges[level,j,i] = (localPS * BP[level]) + AP[level];
+                        PressureEdgeXYPe[level,j,i] = (localSurfacePressure * BP[level]) + AP[level];
                     }
                 }
-            }            
-            return pressureEdges;
+            }
         }
     }
 }
