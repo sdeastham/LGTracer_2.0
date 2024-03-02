@@ -58,7 +58,10 @@ namespace LGTracer
         // Do we calculate the effect of compression on temperature?
         private bool IncludeCompression;
 
-        public PointManager( long? maxPoints, DomainManager domain, bool debug=false, bool includeCompression=false )
+        public string OutputFilename
+        { get; private set; }
+
+        public PointManager( long? maxPoints, DomainManager domain, string filename, bool debug=false, bool includeCompression=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
@@ -68,6 +71,9 @@ namespace LGTracer
             // Are we calculating the effect of adiabatic compression?
             IncludeCompression = includeCompression;
 
+            // Where to output data
+            OutputFilename = filename;
+            
             // Limit on how many points can be managed
             if (maxPoints == null)
             {
@@ -214,6 +220,10 @@ namespace LGTracer
             }
         }
 
+        public bool WriteToFile()
+        {
+            return WriteToFile(OutputFilename);
+        }
         public bool WriteToFile(string fileName)
         {
             bool success = true;

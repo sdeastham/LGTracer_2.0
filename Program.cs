@@ -23,41 +23,18 @@ namespace LGTracer
             }
             LGOptions configOptions = ReadConfig(configFile);
             
-            // Number of Lagrangian points to track
-            long? maxPoints = configOptions.Points.Max;
-            long initialPointCount = configOptions.Points.Initial; // Points to initially scatter randomly
+            // Extract and store relevant variables
             bool debug = configOptions.Debug;
-            bool includeCompression = configOptions.Points.AdiabaticCompression;
             bool updateMeteorology = configOptions.TimeDependentMeteorology;
-            bool seeded = configOptions.Seed != null;
-            //string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory);
-            string outputFileName = "output.nc";
 
-            // Specify the domains
-            // Huge domain
-            //double[] lonLims = [-80.0,15.0];
-            //double[] latLims = [10.0,60.0];
-            //double[] pLims = [85000.0, 20000.0];
-            //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
-
-            // Moderate domain
-            double[] lonLims = [-80.0,15.0];
-            double[] latLims = [10.0,60.0];
-            double[] pLims = [85000.0, 20000.0];
-            double kgPerPoint = configOptions.Points.KgPerPoint; // Air mass represented by a single point in kg (seems a bit off?)
-
-            // Tiny domain
-            //double[] lonLims = [-30.0,0.0];
-            //double[] latLims = [30.0,40.0];
-            //double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
-            //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
-
-            //string metDir = "C:/Data/MERRA-2";
+            // Specify the domain
+            double[] lonLims = configOptions.Domain.LonLimits;
+            double[] latLims = configOptions.Domain.LatLimits;
+            double[] pLims   = [configOptions.Domain.PressureBase * 100.0,
+                                configOptions.Domain.PressureCeiling * 100.0];
+            double kgPerPoint = configOptions.Points.KgPerPoint;
 
             // Major simulation settings
-            //DateTime startDate = new DateTime(2023,1,1,0,0,0);
-            //DateTime endDate   = new DateTime(2023,1,15,0,0,0);
-            //DateTime endDate   = new DateTime(2023,1,5,0,0,0);
             DateTime startDate = configOptions.Timing.StartDate;
             DateTime endDate = configOptions.Timing.EndDate;
             double dt = configOptions.Timesteps.Simulation; // Time step in seconds
@@ -83,7 +60,7 @@ namespace LGTracer
 
             // Central RNG for random point seeding
             System.Random RNG;
-            if (seeded)
+            if (configOptions.Seed != null)
             {
                 // Use this if debugging
                 RNG = new SystemRandomSource((int)configOptions.Seed);
@@ -92,17 +69,29 @@ namespace LGTracer
             {
                 RNG = SystemRandomSource.Default;
             }
+            
+            List<PointManager> pointManagers = [];
 
-            // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            PointManager pointManager = new PointManager(maxPoints,domainManager,includeCompression: configOptions.Points.AdiabaticCompression);
+            for (int i = 0; i < 1; i++)
+            {
+                // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
+                string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
+                    configOptions.Points.OutputFilename);
+                PointManager pointManager = new PointManager(configOptions.Points.Max, domainManager, outputFileName,
+                    includeCompression: configOptions.Points.AdiabaticCompression);
 
-            // Scatter N points randomly over the domain
-            (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(initialPointCount,RNG);
-            pointManager.CreatePointSet(xInitial,yInitial,pInitial);
+                // Scatter N points randomly over the domain
+                (double[] xInitial, double[] yInitial, double[] pInitial) =
+                    domainManager.MapRandomToXYP(configOptions.Points.Initial, RNG);
+                pointManager.CreatePointSet(xInitial, yInitial, pInitial);
+                
+                // Store initial conditions
+                pointManager.ArchiveConditions(tCurr);
 
-            // Set up output
-            // Store initial conditions
-            pointManager.ArchiveConditions(tCurr);
+                // Add to the list of point managers
+                pointManagers.Add(pointManager);
+            }
+
             tStorage += dtStorage;
             int nStored = 1;
 
@@ -131,17 +120,22 @@ namespace LGTracer
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
                 // WARNING: In testing
-                (double[] xSet, double[] ySet, double[] pSet, massSurplus) = domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
-                pointManager.CreatePointSet(xSet, ySet, pSet);
+                foreach (PointManager pointManager in pointManagers)
+                {
+                    (double[] xSet, double[] ySet, double[] pSet, massSurplus) =
+                        domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
+                    pointManager.CreatePointSet(xSet, ySet, pSet);
 
-                (double[] xSetV, double[] ySetV, double[] pSetV, massSurplus) = domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, massSurplus);
-                pointManager.CreatePointSet(xSetV, ySetV, pSetV);
+                    (double[] xSetV, double[] ySetV, double[] pSetV, massSurplus) =
+                        domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, massSurplus);
+                    pointManager.CreatePointSet(xSetV, ySetV, pSetV);
 
-                // Do the actual work
-                if (debug) {Console.WriteLine($"TIME: {tCurr,7:f2}");}
-                pointManager.Advance(dt);
+                    // Do the actual work
+                    pointManager.Advance(dt);
 
-                pointManager.Cull();
+                    // TODO: Allow for this to not happen every time step
+                    pointManager.Cull();
+                }
 
                 nSteps++;
                 tCurr = (iter+1) * dt;
@@ -152,13 +146,16 @@ namespace LGTracer
                 // to compensate for imperfect float comparisons
                 if (tCurr >= (tStorage - 1.0e-10))
                 {
-                    pointManager.ArchiveConditions(tCurr);
+                    foreach (PointManager pointManager in pointManagers)
+                    {
+                        pointManager.ArchiveConditions(tCurr);
+                    }
                     tStorage += dtStorage;
                     nStored += 1;
                 }
                 if (tCurr >= (tReport - 1.0e-10))
                 {
-                    Console.WriteLine($" --> Time at end of time step: {currentDate}. Current point count: {pointManager.NActive,10:d}");
+                    Console.WriteLine($" --> Time at end of time step: {currentDate}. Current point count in first manager: {pointManagers.First().NActive,10:d}");
                     tReport += dtReport;
                 }
             }
@@ -168,20 +165,13 @@ namespace LGTracer
             double msPerStep = elapsedTime/nSteps;
             Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
-            double xMin = domainManager.XMax;
-            foreach (LGPoint point in pointManager.ActivePoints)
+            foreach (PointManager pointManager in pointManagers)
             {
-                xMin = Math.Min(xMin,point.X);
-            }
-
-            bool success = pointManager.WriteToFile(outputFileName);
-            if (success)
-            {
-                Console.WriteLine($"Output data with {nStored} samples [max points stored: {pointManager.MaxStoredPoints}] successfully written to {outputFileName}");
-            }
-            else
-            {
-                Console.WriteLine($"Could not write output to {outputFileName}");
+                bool success = pointManager.WriteToFile();
+                Console.WriteLine(
+                    success
+                        ? $"Output data with {nStored} samples [max points stored: {pointManager.MaxStoredPoints}] successfully written to {pointManager.OutputFilename}"
+                        : $"Could not write output to {pointManager.OutputFilename}");
             }
         }
 
