@@ -97,11 +97,6 @@ namespace LGTracer
 
             // Don't report at initialization
             tReport += dtReport;
-
-            // We only add an integer number of points each time step
-            // If the number of points to be added is non-integer, retain
-            // the surplus and add it in at the next time step
-            double massSurplus = 0.0;
             
             // Set up timing
             int nSteps = 0;
@@ -122,12 +117,12 @@ namespace LGTracer
                 // WARNING: In testing
                 foreach (PointManager pointManager in pointManagers)
                 {
-                    (double[] xSet, double[] ySet, double[] pSet, massSurplus) =
-                        domainManager.SeedBoundary(kgPerPoint, dt, RNG, massSurplus);
+                    (double[] xSet, double[] ySet, double[] pSet, pointManager.MassSurplus) =
+                        domainManager.SeedBoundary(kgPerPoint, dt, RNG, pointManager.MassSurplus);
                     pointManager.CreatePointSet(xSet, ySet, pSet);
 
-                    (double[] xSetV, double[] ySetV, double[] pSetV, massSurplus) =
-                        domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, massSurplus);
+                    (double[] xSetV, double[] ySetV, double[] pSetV, pointManager.MassSurplus) =
+                        domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, pointManager.MassSurplus);
                     pointManager.CreatePointSet(xSetV, ySetV, pSetV);
 
                     // Do the actual work

@@ -61,6 +61,8 @@ namespace LGTracer
         public string OutputFilename
         { get; private set; }
 
+        public double MassSurplus;
+
         public PointManager( long? maxPoints, DomainManager domain, string filename, bool debug=false, bool includeCompression=false )
         {
             // UIDs start from 1 (0 reserved for inactive points)
@@ -68,6 +70,9 @@ namespace LGTracer
 
             VelocityCalc = VCalc;
 
+            // No initial mass surplus
+            MassSurplus = 0.0;
+            
             // Are we calculating the effect of adiabatic compression?
             IncludeCompression = includeCompression;
 
