@@ -1,0 +1,33 @@
+﻿---
+ timing:
+   start-date: "2023-01-01 00:00:00"
+   end-date: "2023-01-05 00:00:00"
+ timesteps:
+   # Simulation heartbeat (seconds)
+   simulation: 300.0
+   # Diagnostic and output (minutes)
+   reporting: 180.0
+   storage: 15.0
+ points:
+    max: null
+    initial: 1000
+    # Calculate delta T due to pressure change?
+    adiabatic-compression: true
+    kg-per-point: 1.0e13
+    output-filename: output.nc
+ domain:
+   east-limit: -80.0
+   west-limit: 15.0
+   south-limit: 10.0
+   north-limit: 60.0
+   pressure-base: 850.0
+   pressure-ceiling: 200.0
+ input-output:
+   met-directory: "C:/Data/MERRA-2"
+   output-directory: .
+ # Use null for the default (system clock)
+ seed: null
+ # Update meteorology over time?
+ time-dependent-meteorology: true
+ # More verbose output?
+ debug: false

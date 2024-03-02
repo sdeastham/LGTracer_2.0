@@ -46,6 +46,7 @@
         public long Initial;
         public bool AdiabaticCompression;
         public double KgPerPoint;
+        public string OutputFilename;
     }
 
     public class LGOptionsDomain
@@ -63,6 +64,6 @@
     public struct LGOptionsIO
     {
         public string MetDirectory;
-        public string OutputFile;
+        public string OutputDirectory;
     }
 }

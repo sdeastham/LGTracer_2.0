@@ -30,7 +30,8 @@ namespace LGTracer
             bool includeCompression = configOptions.Points.AdiabaticCompression;
             bool updateMeteorology = configOptions.TimeDependentMeteorology;
             bool seeded = configOptions.Seed != null;
-            string outputFileName = configOptions.InputOutput.OutputFile;
+            //string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory);
+            string outputFileName = "output.nc";
 
             // Specify the domains
             // Huge domain
@@ -43,7 +44,7 @@ namespace LGTracer
             double[] lonLims = [-80.0,15.0];
             double[] latLims = [10.0,60.0];
             double[] pLims = [85000.0, 20000.0];
-            double kgPerPoint = 1.0e13; // Air mass represented by a single point in kg (seems a bit off?)
+            double kgPerPoint = configOptions.Points.KgPerPoint; // Air mass represented by a single point in kg (seems a bit off?)
 
             // Tiny domain
             //double[] lonLims = [-30.0,0.0];
@@ -51,23 +52,22 @@ namespace LGTracer
             //double[] pLims = [400.0 * 1.0e2, 200.0 * 1.0e2];
             //double kgPerPoint = 5.0e12; // Air mass represented by a single point in kg (seems a bit off?)
 
-            string metDir = "C:/Data/MERRA-2";
+            //string metDir = "C:/Data/MERRA-2";
 
             // Major simulation settings
-            DateTime startDate = new DateTime(2023,1,1,0,0,0);
+            //DateTime startDate = new DateTime(2023,1,1,0,0,0);
             //DateTime endDate   = new DateTime(2023,1,15,0,0,0);
-            DateTime endDate   = new DateTime(2023,1,5,0,0,0);
-            double dt = 60.0 * 5.0; // Time step in seconds
-            double dtStorage = 60.0*15.0; // How often to save out data (seconds)
-            double dtReport = 60.0*60.0; // How often to report to the user?
-
-            // CODE STARTS HERE
+            //DateTime endDate   = new DateTime(2023,1,5,0,0,0);
+            DateTime startDate = configOptions.Timing.StartDate;
+            DateTime endDate = configOptions.Timing.EndDate;
+            double dt = configOptions.Timesteps.Simulation; // Time step in seconds
+            double dtStorage = 60.0 * configOptions.Timesteps.Storage; // How often to save out data (seconds)
+            double dtReport = 60.0 * configOptions.Timesteps.Reporting; // How often to report to the user?
+            
             DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
 
-            // Set up the domain
-            //string metFileNameA3 = string.Format(metFileTemplateA3,currentDate.Year,currentDate.Month,currentDate.Day);
-            //(double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
-            MetManager meteorology = new MetManager(metDir, lonLims, latLims, startDate);
+            // Set up the meteorology and domain
+            MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate);
             (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP, meteorology);
 
@@ -94,7 +94,7 @@ namespace LGTracer
             }
 
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            PointManager pointManager = new PointManager(maxPoints,domainManager,includeCompression: includeCompression);
+            PointManager pointManager = new PointManager(maxPoints,domainManager,includeCompression: configOptions.Points.AdiabaticCompression);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial, double[] pInitial) = domainManager.MapRandomToXYP(initialPointCount,RNG);
