@@ -1,37 +1,27 @@
-namespace LGTracer
+﻿namespace LGTracer
 {
-    public class MetManager
+    public interface IMetProvider
     {
-        // A MetManager handles all met data and exposes the met variables from all files
-        // It is not intended to do any computation, but simply to abstract the data source
-        // so that the rest of the program does not need to know how it was acquired.
-        // In the future this should be split into an interface (guaranteeing that certain
-        // variables and methods are available) with specific implementations which represent
-        // (for example) zero-order holds, linear time interpolation, and so on. Spatial
-        // interpolation should be done outside of this class.
-
+        public void AdvanceToTime(DateTime targetTime);
+        public (double[], double[]) GetXYMesh();
+    }
+    public abstract class MetManager : IMetProvider
+    {
         protected List<MetFile> MetFiles;
+        public abstract double[,,] UWindXYP { get; }
+        public abstract double[,,] VWindXYP { get; }
+        public abstract double[,,] PressureVelocityXYP { get; }
+        public abstract double[,] SurfacePressureXY { get; }
+        public abstract double[,,] SpecificHumidityXYP { get; }
+        public abstract double[,,] CloudIceXYP { get; }
+        public abstract double[,,] CloudWaterXYP { get; }
+        public abstract double[,,] TemperatureXYP { get; }
 
-        // Convenience variables
-        public double[,,] UWindXYP => MetFiles[A3DynIndex].DataVariables3D[UIndex].CurrentData;
-
-        public double[,,] VWindXYP => MetFiles[A3DynIndex].DataVariables3D[VIndex].CurrentData;
-
-        public double[,,] PressureVelocityXYP => MetFiles[A3DynIndex].DataVariables3D[OmegaIndex].CurrentData;
-
-        public double[,] SurfacePressureXY => MetFiles[I3Index].DataVariables2D[PSIndex].CurrentData;
-
-        public double[,,] SpecificHumidityXYP => MetFiles[I3Index].DataVariables3D[QVIndex].CurrentData; // kg water vapour per kg air
-
-        public double[,,] CloudIceXYP => MetFiles[A3CldIndex].DataVariables3D[QIIndex].CurrentData; // kg ice water per kg air
-        public double[,,] CloudWaterXYP => MetFiles[A3CldIndex].DataVariables3D[QLIndex].CurrentData; // kg liquid water per kg air
-        public double[,,] TemperatureXYP => MetFiles[I3Index].DataVariables3D[TIndex].CurrentData;
-        
         // Locations in arrays
-        private int I3Index, A3DynIndex, A3CldIndex;
-        private int PSIndex, TIndex, QVIndex, QIIndex, QLIndex;
-        private int UIndex, VIndex, OmegaIndex;
-
+        protected int I3Index, A3DynIndex, A3CldIndex;
+        protected int PSIndex, TIndex, QVIndex, QIIndex, QLIndex;
+        protected int UIndex, VIndex, OmegaIndex;
+        
         public MetManager(string metDir, double[] lonLims, double[] latLims, DateTime startDate)
         {
             MetFiles = [];
@@ -84,7 +74,7 @@ namespace LGTracer
             QIIndex = Array.FindIndex(A3CldVarList3D,element => element == "QI");
             QLIndex = Array.FindIndex(A3CldVarList3D,element => element == "QL");
         }
-
+        
         public void AdvanceToTime(DateTime targetTime)
         {
             foreach (MetFile metFile in MetFiles)

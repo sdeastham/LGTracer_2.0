@@ -23,8 +23,16 @@ namespace LGTracer
         public double Temperature
         { get; protected set; }
 
-        public double SpecificHumidity
+        public double SpecificHumidity // kg water vapor per kg air
         { get; protected set; }
+        
+        public double LiquidWaterContent // kg water per kg air
+        { get; protected set; }
+        
+        public double IceWaterContent // kg ice per kg air
+        { get; protected set; }
+
+        public double TotalWaterContent => IceWaterContent + LiquidWaterContent + SpecificHumidity;
 
         public double RelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, SpecificHumidity);
 
