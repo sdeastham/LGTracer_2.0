@@ -7,6 +7,8 @@ using System.Numerics;
 
 namespace LGTracer
 {
+    // The Domain Manager is designed to handle everything which happens on the grid. It also specifies the limits of
+    // the domain.
     public class DomainManager
     {
 
@@ -66,34 +68,31 @@ namespace LGTracer
 
         protected int[,] BoundaryFaceIndices
         { get; set; }
-
-        public double[,,] XSpeedXYP
-        { get; protected set; }
-
-        public double[,,] YSpeedXYP
-        { get; protected set; }
         
-        public double[,,] PressureVelocityXYP
-        { get; protected set; }
-
         public int[,] BaseLevel
         { get; protected set; }
 
         public int[,] CeilingLevel
         { get; protected set; }
 
-        public double[,] SurfacePressureXY
-        { get; protected set; }
+        // Meteorological data
+        public double[,,] XSpeedXYP => Meteorology.UWindXYP;
 
+        public double[,,] YSpeedXYP => Meteorology.VWindXYP;
+
+        public double[,,] PressureVelocityXYP => Meteorology.PressureVelocityXYP;
+
+        public double[,] SurfacePressureXY => Meteorology.SurfacePressureXY;
+
+        public double[,,] TemperatureXYP => Meteorology.TemperatureXYP;
+
+        public double[,,] SpecificHumidityXYP => Meteorology.SpecificHumidityXYP;
+        
+        // Derived variables
         public double[,,] PressureEdgeXYPe
         { get; protected set; }
 
-        public double[,,] TemperatureXYP
-        { get; protected set; }
-
-        public double[,,] SpecificHumidityXYP
-        { get; protected set; }
-
+        // Vertical indexing
         public double PBase
         { get; protected set; }
 
@@ -108,14 +107,11 @@ namespace LGTracer
 
         public double[,] CellArea
         { get; protected set; }
-
-        protected DateTime LastMetUpdate
+        
+        private MetManager Meteorology
         { get; set; }
 
-        protected DateTime NextMetUpdate
-        { get; set; }
-
-        public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors)
+        public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors, MetManager meteorology)
         {
             // Set up the vertical coordinates
             // NB: PBase and PCeiling indicate where we cull, not the vertical
@@ -208,15 +204,15 @@ namespace LGTracer
             CreateBoundary();
 
             // Set up the meteorological data
-            XSpeedXYP = new double[NLevels,NY,NX];
-            YSpeedXYP = new double[NLevels,NY,NX];
-            SurfacePressureXY = new double[NY,NX];
             PressureEdgeXYPe = new double[NLevels+1,NY,NX];
-            PressureVelocityXYP = new double[NLevels,NY,NX];
-            TemperatureXYP = new double[NLevels,NY,NX];
-            SpecificHumidityXYP = new double[NLevels,NY,NX];
             BaseLevel = new int[NY,NX];
             CeilingLevel = new int[NY,NX];
+            
+            // Store the met manager for future reference
+            Meteorology = meteorology;
+            
+            // Generate derived quantities (e.g. pressure edges)
+            UpdateMeteorology();
         }
 
         [MemberNotNull(nameof(CellArea))]
@@ -244,35 +240,13 @@ namespace LGTracer
             }
         }
 
-        public void UpdateMeteorologyFromManager( MetManager meteorology )
+        public void UpdateMeteorology()
         {
-            UpdateMeteorology(meteorology.SurfacePressureXY, meteorology.UWindXYP, meteorology.VWindXYP, meteorology.PressureVelocityXYP, meteorology.TemperatureXYP, meteorology.SpecificHumidityXYP);
-        }
-        
-        public void UpdateMeteorology( double[,] surfacePressure, double[,,] xSpeed, double[,,] ySpeed, double[,,] omega, double[,,] temperature, double[,,] specificHumidity )
-        {
-            // Update stored meteorology and derived quantities
-            int kBase, kCeiling;
-            for (int i=0; i<NX; i++)
-            {
-                for (int j=0; j<NY; j++)
-                {
-                    SurfacePressureXY[j,i] = surfacePressure[j,i];
-                    for (int k=0; k<NLevels; k++)
-                    {
-                        XSpeedXYP[k,j,i] = xSpeed[k,j,i];
-                        YSpeedXYP[k,j,i] = ySpeed[k,j,i];
-                        PressureVelocityXYP[k,j,i] = omega[k,j,i];
-                        TemperatureXYP[k,j,i] = temperature[k,j,i];
-                        SpecificHumidityXYP[k,j,i] = specificHumidity[k,j,i];
-                    }
-                }
-            }
-
-            // Get the pressure edges too
+            // Update derived quantities
             PressureEdgeXYPe = CalculatePressures(SurfacePressureXY);
 
             // Find the level which corresponds to the base and ceiling of the domain
+            int kBase, kCeiling;
             for (int i=0; i<NX; i++)
             {
                 for (int j=0; j<NY; j++)
@@ -289,7 +263,8 @@ namespace LGTracer
                             // Set base quantities
                             BaseLevel[j,i] = kBase;
                         }
-                        if (kCeiling < 0 && PressureEdgeXYPe[k+1,j,i] < PCeiling)
+                        // kCeiling will always be < 0 if we hit this - implied
+                        if (PressureEdgeXYPe[k+1,j,i] < PCeiling)
                         {
                             kCeiling = k;
                             // Set ceiling quantities

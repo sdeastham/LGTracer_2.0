@@ -76,12 +76,11 @@ namespace LGTracer
     public class MetData2D : MetData
     {
         protected double[][,] FullData;
-        protected double[,] NextData
-        { get { return FullData[TimeIndex%TimesPerFile]; } }
-        protected double[,] PreviousData
-        { get { return FullData[(TimeIndex-1)%TimesPerFile]; } }
-        public double[,] CurrentData
-        { get { return PreviousData; } }
+        protected double[,] NextData => FullData[TimeIndex%TimesPerFile];
+
+        protected double[,] PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
+
+        public double[,] CurrentData => PreviousData;
 
         public MetData2D(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
         {
@@ -123,12 +122,11 @@ namespace LGTracer
     public class MetData3D : MetData
     {
         protected double[][,,] FullData;
-        protected double[,,] NextData
-        { get { return FullData[TimeIndex%TimesPerFile]; } }
-        protected double[,,] PreviousData
-        { get { return FullData[(TimeIndex-1)%TimesPerFile]; } }
-        public double[,,] CurrentData
-        { get { return PreviousData; } }
+        protected double[,,] NextData => FullData[TimeIndex%TimesPerFile];
+
+        protected double[,,] PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
+
+        public double[,,] CurrentData => PreviousData;
 
         public int NZ
         { get; protected set; }

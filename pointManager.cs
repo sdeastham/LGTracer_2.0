@@ -1,10 +1,3 @@
-//using MathNet.Numerics;
-//using MathNet.Numerics.LinearAlgebra;
-
-using System;
-using System.Linq;
-using System.Collections.Generic;
-
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
@@ -25,8 +18,7 @@ namespace LGTracer
         private uint NextUID
         { get {nextUID += 1; return nextUID - 1;}}
 
-        public long NPoints
-        { get => NActive + NInactive; }
+        public long NPoints => NActive + NInactive;
 
         // Handling this explicitly is more efficient than constantly taking LongCounts
         public long NActive
@@ -71,9 +63,7 @@ namespace LGTracer
             // UIDs start from 1 (0 reserved for inactive points)
             nextUID = 1;
 
-            // Set the velocity calculation
-            Func<double, double, double, (double, double, double)> vCalc = (double x, double y, double pressure) => domain.VelocityFromFixedSpaceArray(x,y,pressure,false);
-            VelocityCalc = vCalc;
+            VelocityCalc = VCalc;
 
             // Are we calculating the effect of adiabatic compression?
             IncludeCompression = includeCompression;
@@ -104,6 +94,10 @@ namespace LGTracer
 
             // Run in debug mode?
             Debug = debug;
+            return;
+
+            // Set the velocity calculation
+            (double, double, double) VCalc(double x, double y, double pressure) => domain.VelocityFromFixedSpaceArray(x, y, pressure, false);
         }
 
         private LGPoint AddPoint( double x, double y, double pressure )
@@ -120,6 +114,7 @@ namespace LGTracer
         private LGPoint ActivatePoint( double x, double y, double pressure )
         {
             // Reactivate the first available dormant point and assign it a new UID
+            System.Diagnostics.Debug.Assert(InactivePoints.First != null, "InactivePoints.First != null");
             LinkedListNode<LGPoint> node = InactivePoints.First;
             LGPoint point = node.Value;
             InactivePoints.Remove(node);
@@ -197,12 +192,11 @@ namespace LGTracer
         public void Cull()
         {
             // Deactivate any points which are outside the domain
-            LinkedListNode<LGPoint> node = ActivePoints.First;
-            LinkedListNode<LGPoint> nextNode;
+            LinkedListNode<LGPoint>? node = ActivePoints.First;
             // The structure below is necessary because we can't get the next node from a deactivated node
             while (node != null)
             {
-                nextNode = node.Next;
+                LinkedListNode<LGPoint>? nextNode = node.Next;
                 LGPoint point = node.Value;
                 if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax || point.Pressure > Domain.PBase || point.Pressure < Domain.PCeiling )
                 {

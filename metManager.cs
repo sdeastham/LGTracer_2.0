@@ -3,26 +3,31 @@ namespace LGTracer
     public class MetManager
     {
         // A MetManager handles all met data and exposes the met variables from all files
+        // It is not intended to do any computation, but simply to abstract the data source
+        // so that the rest of the program does not need to know how it was acquired.
+        // In the future this should be split into an interface (guaranteeing that certain
+        // variables and methods are available) with specific implementations which represent
+        // (for example) zero-order holds, linear time interpolation, and so on. Spatial
+        // interpolation should be done outside of this class.
 
         protected List<MetFile> MetFiles;
 
-        public double[,,] UWindXYP
-        { get { return MetFiles[A3DynIndex].DataVariables3D[UIndex].CurrentData; } }
-        public double[,,] VWindXYP
-        { get { return MetFiles[A3DynIndex].DataVariables3D[VIndex].CurrentData; } }
-        public double[,,] PressureVelocityXYP
-        { get { return MetFiles[A3DynIndex].DataVariables3D[OmegaIndex].CurrentData; } }
+        // Convenience variables
+        public double[,,] UWindXYP => MetFiles[A3DynIndex].DataVariables3D[UIndex].CurrentData;
 
-        public double[,] SurfacePressureXY
-        { get { return MetFiles[I3Index].DataVariables2D[PSIndex].CurrentData; } }
-        public double[,,] SpecificHumidityXYP // kg water vapour per kg air
-        { get { return MetFiles[I3Index].DataVariables3D[QVIndex].CurrentData; } }
-        public double[,,] CloudIceXYP // kg ice water per kg air
-        { get { return MetFiles[A3CldIndex].DataVariables3D[QIIndex].CurrentData; } }
-        public double[,,] CloudWaterXYP // kg liquid water per kg air
-        { get { return MetFiles[A3CldIndex].DataVariables3D[QLIndex].CurrentData; } }
-        public double[,,] TemperatureXYP
-        { get { return MetFiles[I3Index].DataVariables3D[TIndex].CurrentData; } }
+        public double[,,] VWindXYP => MetFiles[A3DynIndex].DataVariables3D[VIndex].CurrentData;
+
+        public double[,,] PressureVelocityXYP => MetFiles[A3DynIndex].DataVariables3D[OmegaIndex].CurrentData;
+
+        public double[,] SurfacePressureXY => MetFiles[I3Index].DataVariables2D[PSIndex].CurrentData;
+
+        public double[,,] SpecificHumidityXYP => MetFiles[I3Index].DataVariables3D[QVIndex].CurrentData; // kg water vapour per kg air
+
+        public double[,,] CloudIceXYP => MetFiles[A3CldIndex].DataVariables3D[QIIndex].CurrentData; // kg ice water per kg air
+        public double[,,] CloudWaterXYP => MetFiles[A3CldIndex].DataVariables3D[QLIndex].CurrentData; // kg liquid water per kg air
+        public double[,,] TemperatureXYP => MetFiles[I3Index].DataVariables3D[TIndex].CurrentData;
+        
+        // Locations in arrays
         private int I3Index, A3DynIndex, A3CldIndex;
         private int PSIndex, TIndex, QVIndex, QIIndex, QLIndex;
         private int UIndex, VIndex, OmegaIndex;

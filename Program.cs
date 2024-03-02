@@ -21,12 +21,14 @@ namespace LGTracer
             Console.WriteLine("Initiating LGTracer program");
 
             // Number of Lagrangian points to track
-            long nPoints = 100000;
-            long nInitial = 1000; // Points to initially scatter randomly
-            bool debug = false;
-            bool includeCompression = false; // Calculate delta T due to pressure change?
-            bool updateMeteorology = true; // Allow meteorology to update over time
-            bool seeded = true; // Use the same seed for all runs to guarantee meteorology
+            const long nPoints = 100000;
+            const long nInitial = 1000; // Points to initially scatter randomly
+            const bool debug = false;
+            const bool includeCompression = true; // Calculate delta T due to pressure change?
+            const bool updateMeteorology = true; // Allow meteorology to update over time
+            const bool seeded = true; // Use the same seed for all runs to guarantee meteorology
+            
+            
             string metOption, compressionOption;
             if (updateMeteorology)
             {
@@ -83,8 +85,7 @@ namespace LGTracer
             //(double[] lonEdge, double[] latEdge, int[] lonSet, int[] latSet ) = MERRA2.ReadLatLon( metFileNameA3, lonLims, latLims );
             MetManager meteorology = new MetManager(metDir, lonLims, latLims, startDate);
             (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
-            DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP);
-            domainManager.UpdateMeteorologyFromManager(meteorology);
+            DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP, meteorology);
 
             // Time handling
             double nDays = (endDate - startDate).TotalDays; // Days to run
@@ -141,7 +142,8 @@ namespace LGTracer
                 if (updateMeteorology)
                 {
                     meteorology.AdvanceToTime(currentDate);
-                    domainManager.UpdateMeteorologyFromManager(meteorology);
+                    // Calculate derived quantities
+                    domainManager.UpdateMeteorology();
                 }
 
                 // If we have enough points available, scatter them evenly over the edges of the domain
