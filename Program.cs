@@ -24,8 +24,8 @@ namespace LGTracer
             long nPoints = 100000;
             long nInitial = 1000; // Points to initially scatter randomly
             bool debug = false;
-            bool includeCompression = true; // Calculate delta T due to pressure change?
-            bool updateMeteorology = false; // Allow meteorology to update over time
+            bool includeCompression = false; // Calculate delta T due to pressure change?
+            bool updateMeteorology = true; // Allow meteorology to update over time
             bool seeded = true; // Use the same seed for all runs to guarantee meteorology
             string metOption, compressionOption;
             if (updateMeteorology)
@@ -44,7 +44,7 @@ namespace LGTracer
             {
                 compressionOption = "fixedT";
             }
-            string outputFileName = $"output_{metOption}_{compressionOption}.nc";
+            string outputFileName = $"outputRider_{metOption}_{compressionOption}.nc";
 
             // Specify the domains
             // Huge domain
@@ -69,7 +69,8 @@ namespace LGTracer
 
             // Major simulation settings
             DateTime startDate = new DateTime(2023,1,1,0,0,0);
-            DateTime endDate   = new DateTime(2023,1,15,0,0,0);
+            //DateTime endDate   = new DateTime(2023,1,15,0,0,0);
+            DateTime endDate   = new DateTime(2023,1,5,0,0,0);
             double dt = 60.0 * 5.0; // Time step in seconds
             double dtStorage = 60.0*15.0; // How often to save out data (seconds)
             double dtReport = 60.0*60.0; // How often to report to the user?
