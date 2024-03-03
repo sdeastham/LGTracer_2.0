@@ -17,10 +17,8 @@ namespace LGTracer
         private DateTime[] TimeVec;
         private string FileTemplate;
         private int SecondOffset; // Number of seconds to offset times which are read in
-        public List<MetData2D> DataVariables2D
-        { get; private set; }
-        public List<MetData3D> DataVariables3D
-        { get; private set; }
+        public List<IMetData> DataVariables { get; private set; }
+        public List<string> DataNames { get; private set; }
         private int[] XBounds, YBounds;
         private double[] XEdge, YEdge;
         private double[] XLim, YLim;
@@ -28,7 +26,7 @@ namespace LGTracer
         private int TimeIndex;
         private TimeSpan TimeDelta;
 
-        public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D, double[] xLim, double[] yLim, int secondOffset=0)
+    public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D, double[] xLim, double[] yLim, int secondOffset=0)
         {
             FileTemplate = fileTemplate;
             SecondOffset = secondOffset;
@@ -39,8 +37,8 @@ namespace LGTracer
             // the X and Y bounds for reading are found
             ReadFile(firstTime,true); // << Seems that this is not establishing DS?
             int nTimes = TimeVec.Length;
-            DataVariables2D = [];
-            DataVariables3D = [];
+            DataVariables = [];
+            DataNames = [];
             double scaleValue = 1.0;
             double offsetValue = 0.0;
             TimeIndex = 0;
@@ -48,51 +46,56 @@ namespace LGTracer
             TimeDelta = TimeVec[1] - TimeVec[0];
             foreach (string varName in dataFields2D)
             {
-                MetData2D metVar = new MetData2D(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                IMetData metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
                 metVar.Update(DS);
-                DataVariables2D.Add(metVar);
+                DataVariables.Add(metVar);
+                DataNames.Add(varName);
             }
             foreach (string varName in dataFields3D)
             {
-                MetData3D metVar = new MetData3D(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
+                IMetData metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
                 metVar.Update(DS);
-                DataVariables3D.Add(metVar);
+                DataVariables.Add(metVar);
+                DataNames.Add(varName);
             }
             AdvanceToTime(firstTime);
         }
-
+    
         public void AdvanceToTime(DateTime newTime)
         {
             // Scan through the current times
-            while (TimeVec[TimeIndex+1] < newTime)
+            while (TimeVec[TimeIndex + 1] < newTime)
             {
                 TimeIndex++;
                 // If the time index now points to the final time in 
                 // the vector, then we need to update the underlying
                 // date structure
-                if (TimeIndex >= (TimeVec.Length-1))
+                if (TimeIndex >= (TimeVec.Length - 1))
                 {
-                    DateTime nextTime = TimeVec[TimeVec.Length-1] + TimeDelta;
-                    ReadFile(nextTime,false);
+                    DateTime nextTime = TimeVec[TimeVec.Length - 1] + TimeDelta;
+                    ReadFile(nextTime, false);
                     TimeIndex = 0;
                 }
+
                 // Update all the variables
                 // An interface would be a good idea here...
-                foreach (MetData2D metVar in DataVariables2D)
-                {
-                    metVar.Update(DS);
-                }
-                foreach (MetData3D metVar in DataVariables3D)
+                foreach (IMetData metVar in DataVariables)
                 {
                     metVar.Update(DS);
                 }
             }
+        }
+
+        public double IntervalFraction(DateTime targetTime)
+        {
+            // How far through the current time interval is the proposed time?
+            return (targetTime - TimeVec[TimeIndex]).TotalSeconds / TimeDelta.TotalSeconds;
         }
         private string FillTemplate(DateTime targetTime)
         {

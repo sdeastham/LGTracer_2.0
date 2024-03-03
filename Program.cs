@@ -44,7 +44,7 @@ namespace LGTracer
             DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
 
             // Set up the meteorology and domain
-            MetManager meteorology = new MetManagerFixed(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate);
+            MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate);
             (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
             DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP, meteorology);
 

@@ -1,21 +1,21 @@
 ﻿namespace LGTracer
 {
-    public interface IMetProvider
-    {
-        public void AdvanceToTime(DateTime targetTime);
-        public (double[], double[]) GetXYMesh();
-    }
-    public abstract class MetManager : IMetProvider
+    public class MetManager
     {
         protected List<MetFile> MetFiles;
-        public abstract double[,,] UWindXYP { get; }
-        public abstract double[,,] VWindXYP { get; }
-        public abstract double[,,] PressureVelocityXYP { get; }
-        public abstract double[,] SurfacePressureXY { get; }
-        public abstract double[,,] SpecificHumidityXYP { get; }
-        public abstract double[,,] CloudIceXYP { get; }
-        public abstract double[,,] CloudWaterXYP { get; }
-        public abstract double[,,] TemperatureXYP { get; }
+        public double[,,] UWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[UIndex]).CurrentData;
+
+        public double[,,] VWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[VIndex]).CurrentData;
+
+        public double[,,] PressureVelocityXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[OmegaIndex]).CurrentData;
+
+        public double[,] SurfacePressureXY => ((MetData2D)MetFiles[I3Index].DataVariables[PSIndex]).CurrentData;
+
+        public double[,,] SpecificHumidityXYP => ((MetData3D)MetFiles[I3Index].DataVariables[QVIndex]).CurrentData; // kg water vapour per kg air
+
+        public double[,,] CloudIceXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QIIndex]).CurrentData; // kg ice water per kg air
+        public double[,,] CloudWaterXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QLIndex]).CurrentData; // kg liquid water per kg air
+        public double[,,] TemperatureXYP => ((MetData3D)MetFiles[I3Index].DataVariables[TIndex]).CurrentData;
 
         // Locations in arrays
         protected int I3Index, A3DynIndex, A3CldIndex;
@@ -51,9 +51,9 @@
 
             // Set up connections
             I3Index = MetFiles.Count() - 1;
-            PSIndex = Array.FindIndex(I3VarList2D,element => element == "PS");
-            QVIndex = Array.FindIndex(I3VarList3D,element => element == "QV");
-            TIndex  = Array.FindIndex(I3VarList3D,element => element == "T");
+            PSIndex = currentFile.DataNames.FindIndex(element => element == "PS");
+            QVIndex = currentFile.DataNames.FindIndex(element => element == "QV");
+            TIndex  = currentFile.DataNames.FindIndex(element => element == "T");
 
             // 3-hour averaged, dynamics
             currentTemplate = Path.Combine(metDir,"{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.05x0625.nc4");
@@ -61,9 +61,9 @@
             MetFiles.Add(currentFile);
 
             A3DynIndex = MetFiles.Count() - 1;
-            UIndex      = Array.FindIndex(A3DynVarList3D,element => element == "U");
-            VIndex      = Array.FindIndex(A3DynVarList3D,element => element == "V");
-            OmegaIndex  = Array.FindIndex(A3DynVarList3D,element => element == "OMEGA");
+            UIndex      = currentFile.DataNames.FindIndex(element => element == "U");
+            VIndex      = currentFile.DataNames.FindIndex(element => element == "V");
+            OmegaIndex  = currentFile.DataNames.FindIndex(element => element == "OMEGA");
             
             // 3-hour averaged, cloud
             currentTemplate = Path.Combine(metDir,"{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3cld.05x0625.nc4");
@@ -71,8 +71,8 @@
             MetFiles.Add(currentFile);
 
             A3CldIndex = MetFiles.Count() - 1;
-            QIIndex = Array.FindIndex(A3CldVarList3D,element => element == "QI");
-            QLIndex = Array.FindIndex(A3CldVarList3D,element => element == "QL");
+            QIIndex = currentFile.DataNames.FindIndex(element => element == "QI");
+            QLIndex = currentFile.DataNames.FindIndex(element => element == "QL");
         }
         
         public void AdvanceToTime(DateTime targetTime)

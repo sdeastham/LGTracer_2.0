@@ -4,10 +4,20 @@ using Microsoft.Research.Science.Data.NetCDF4;
 
 namespace LGTracer
 {
-    public abstract class MetData
+    public interface IMetData
+    {
+        void Update(DataSet ds);
+    }
+    public abstract class MetData<T> : IMetData
     {
         public int NDimensions
         {get; protected set; }
+        
+        protected T[] FullData { get; set; }
+
+        public abstract T CurrentData { get; protected set; }
+        public T NextData => FullData[TimeIndex%TimesPerFile];
+        public T PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
 
         protected int TimeIndex; // What was the last time index in FullData used to set NextData?
         protected int TimesPerFile; // How many times in each file?
@@ -73,15 +83,8 @@ namespace LGTracer
         }
     }
 
-    public class MetData2D : MetData
+    public abstract class MetData2D : MetData<double[,]>
     {
-        protected double[][,] FullData;
-        protected double[,] NextData => FullData[TimeIndex%TimesPerFile];
-
-        protected double[,] PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
-
-        public double[,] CurrentData => PreviousData;
-
         public MetData2D(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
         {
             FullData = new double[TimesPerFile+1][,];
@@ -118,16 +121,9 @@ namespace LGTracer
             }
         }
     }
-
-    public class MetData3D : MetData
+    
+    public abstract class MetData3D : MetData<double[,,]>
     {
-        protected double[][,,] FullData;
-        protected double[,,] NextData => FullData[TimeIndex%TimesPerFile];
-
-        protected double[,,] PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
-
-        public double[,,] CurrentData => PreviousData;
-
         public int NZ
         { get; protected set; }
 
@@ -170,5 +166,58 @@ namespace LGTracer
                 }
             }
         }
+    }
+    
+    // Fixed implementations
+    public class MetData3DFixed : MetData3D
+    {
+        public override double[,,] CurrentData
+        {
+            get => PreviousData;
+            protected set => throw new InvalidOperationException("CurrentData field should not be set directly for a fixed met data object");
+        }
+
+        public MetData3DFixed(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile,
+            double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
+            scaleValue, offsetValue) {}
+    }
+
+    public class MetData2DFixed : MetData2D
+    {
+        public override double[,] CurrentData
+        {
+            get => PreviousData;
+            protected set => throw new InvalidOperationException("CurrentData field should not be set directly for a fixed met data object");
+        }
+
+        public MetData2DFixed(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile,
+            double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, timesPerFile,
+            scaleValue, offsetValue) {}
+    }
+    
+    public class MetData3DLinterp : MetData3D
+    {
+        public override double[,,] CurrentData
+        {
+            get => PreviousData;
+            protected set => throw new NotImplementedException("Interpolation not implemented");
+        }
+
+        public MetData3DLinterp(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile,
+            double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
+            scaleValue, offsetValue) {}
+    }
+    
+    public class MetData2DLinterp : MetData2D
+    {
+        public override double[,] CurrentData
+        {
+            get => PreviousData;
+            protected set => throw new NotImplementedException("Interpolation not implemented");
+        }
+        
+        public MetData2DLinterp(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile,
+            double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, timesPerFile,
+            scaleValue, offsetValue) {}
     }
 }
