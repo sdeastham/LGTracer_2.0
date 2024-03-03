@@ -70,8 +70,12 @@ namespace LGTracer
         public void AdvanceToTime(DateTime newTime)
         {
             // Scan through the current times
+            // Track whether we need to update - this is important because in theory
+            // we could end up with the same time index
+            bool updateFiles = false;
             while (TimeVec[TimeIndex + 1] < newTime)
             {
+                updateFiles = true;
                 TimeIndex++;
                 // If the time index now points to the final time in 
                 // the vector, then we need to update the underlying
@@ -90,9 +94,19 @@ namespace LGTracer
                     metVar.Update(DS);
                 }
             }
+            // To allow for interpolation. This could get quite expensive
+            // so first verify that it's actually going to be necessary
+            if (updateFiles)
+            {
+                double newTimeFraction = IntervalFraction(newTime);
+                foreach (IMetData metVar in DataVariables)
+                {
+                    metVar.SetTimeFraction(newTimeFraction);
+                }
+            }
         }
 
-        public double IntervalFraction(DateTime targetTime)
+        private double IntervalFraction(DateTime targetTime)
         {
             // How far through the current time interval is the proposed time?
             return (targetTime - TimeVec[TimeIndex]).TotalSeconds / TimeDelta.TotalSeconds;

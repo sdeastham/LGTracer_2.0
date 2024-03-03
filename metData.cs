@@ -7,12 +7,14 @@ namespace LGTracer
     public interface IMetData
     {
         void Update(DataSet ds);
+        void SetTimeFraction(double timeFraction);
     }
     public abstract class MetData<T> : IMetData
     {
         public int NDimensions
         {get; protected set; }
-        
+
+        protected double TimeFraction;
         protected T[] FullData { get; set; }
 
         public abstract T CurrentData { get; protected set; }
@@ -80,6 +82,11 @@ namespace LGTracer
             {
                 TimeIndex++;
             }
+        }
+
+        public virtual void SetTimeFraction(double timeFraction)
+        {
+            TimeFraction = timeFraction;
         }
     }
 
@@ -195,12 +202,28 @@ namespace LGTracer
             scaleValue, offsetValue) {}
     }
     
+    // The Linterp approach interpolates the field when the time is updated, and only then
     public class MetData3DLinterp : MetData3D
     {
-        public override double[,,] CurrentData
+        public override double[,,] CurrentData { get; protected set; }
+
+        public override void SetTimeFraction(double timeFraction)
         {
-            get => PreviousData;
-            protected set => throw new NotImplementedException("Interpolation not implemented");
+            TimeFraction = timeFraction;
+            double previousFraction = 1.0 - timeFraction;
+            double nextFraction = timeFraction;
+            CurrentData = new double[NZ, NY, NX];
+            for (int i = 0; i < NX; i++)
+            {
+                for (int j = 0; j < NY; j++)
+                {
+                    for (int k = 0; k < NZ; k++)
+                    {
+                        CurrentData[k, j, i] = (previousFraction * PreviousData[k, j, i]) +
+                                               (nextFraction * NextData[k, j, i]);
+                    }
+                }
+            }
         }
 
         public MetData3DLinterp(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile,
@@ -210,10 +233,22 @@ namespace LGTracer
     
     public class MetData2DLinterp : MetData2D
     {
-        public override double[,] CurrentData
+        public override double[,] CurrentData { get; protected set; }
+        
+        public override void SetTimeFraction(double timeFraction)
         {
-            get => PreviousData;
-            protected set => throw new NotImplementedException("Interpolation not implemented");
+            TimeFraction = timeFraction;
+            double previousFraction = 1.0 - timeFraction;
+            double nextFraction = timeFraction;
+            CurrentData = new double[NY, NX];
+            for (int i = 0; i < NX; i++)
+            {
+                for (int j = 0; j < NY; j++)
+                {
+                    CurrentData[j, i] = (previousFraction * PreviousData[j, i]) + 
+                                        (nextFraction * NextData[j, i]);
+                }
+            }
         }
         
         public MetData2DLinterp(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile,
