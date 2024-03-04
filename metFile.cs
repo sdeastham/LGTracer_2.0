@@ -46,7 +46,7 @@ namespace LGTracer
             TimeDelta = TimeVec[1] - TimeVec[0];
             foreach (string varName in dataFields2D)
             {
-                IMetData metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                IMetData metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
@@ -56,7 +56,7 @@ namespace LGTracer
             }
             foreach (string varName in dataFields3D)
             {
-                IMetData metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
+                IMetData metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
@@ -64,15 +64,15 @@ namespace LGTracer
                 DataVariables.Add(metVar);
                 DataNames.Add(varName);
             }
-            AdvanceToTime(firstTime);
+            AdvanceToTime(firstTime, forceUpdate: true);
         }
     
-        public void AdvanceToTime(DateTime newTime)
+        public void AdvanceToTime(DateTime newTime, bool forceUpdate = false)
         {
             // Scan through the current times
             // Track whether we need to update - this is important because in theory
             // we could end up with the same time index
-            bool updateFiles = false;
+            bool updateFiles = forceUpdate;
             while (TimeVec[TimeIndex + 1] < newTime)
             {
                 updateFiles = true;
