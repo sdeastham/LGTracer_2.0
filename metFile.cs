@@ -26,7 +26,8 @@ namespace LGTracer
         private int TimeIndex;
         private TimeSpan TimeDelta;
 
-    public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D, double[] xLim, double[] yLim, int secondOffset=0)
+    public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D,
+                   double[] xLim, double[] yLim, int secondOffset=0, bool timeInterp=true)
         {
             FileTemplate = fileTemplate;
             SecondOffset = secondOffset;
@@ -46,7 +47,16 @@ namespace LGTracer
             TimeDelta = TimeVec[1] - TimeVec[0];
             foreach (string varName in dataFields2D)
             {
-                IMetData metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                IMetData metVar;
+                if (timeInterp)
+                {
+                    metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                }
+                else
+                {
+                    metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                }
+
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);
@@ -56,7 +66,17 @@ namespace LGTracer
             }
             foreach (string varName in dataFields3D)
             {
-                IMetData metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
+                IMetData metVar;
+                if (timeInterp)
+                {
+                    metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, scaleValue,
+                        offsetValue);
+                }
+                else
+                {
+                    metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
+                }
+
                 // Need to update twice to fill the initial data array
                 // and align to the first entry
                 metVar.Update(DS);

@@ -46,7 +46,7 @@
 
             // 3-hour instantaneous
             currentTemplate = Path.Combine(metDir,"{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.05x0625.nc4");
-            currentFile = new MetFile(currentTemplate,startDate,I3VarList2D,I3VarList3D,lonLims,latLims,I3Offset);
+            currentFile = new MetFile(currentTemplate,startDate,I3VarList2D,I3VarList3D,lonLims,latLims,I3Offset,timeInterp:true);
             MetFiles.Add(currentFile);
 
             // Set up connections
@@ -57,7 +57,7 @@
 
             // 3-hour averaged, dynamics
             currentTemplate = Path.Combine(metDir,"{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.05x0625.nc4");
-            currentFile = new MetFile(currentTemplate,startDate,A3DynVarList2D,A3DynVarList3D,lonLims,latLims,A3Offset);
+            currentFile = new MetFile(currentTemplate,startDate,A3DynVarList2D,A3DynVarList3D,lonLims,latLims,A3Offset,timeInterp: false);
             MetFiles.Add(currentFile);
 
             A3DynIndex = MetFiles.Count() - 1;
@@ -67,7 +67,7 @@
             
             // 3-hour averaged, cloud
             currentTemplate = Path.Combine(metDir,"{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3cld.05x0625.nc4");
-            currentFile = new MetFile(currentTemplate,startDate,A3CldVarList2D,A3CldVarList3D,lonLims,latLims,A3Offset);
+            currentFile = new MetFile(currentTemplate,startDate,A3CldVarList2D,A3CldVarList3D,lonLims,latLims,A3Offset,timeInterp: false);
             MetFiles.Add(currentFile);
 
             A3CldIndex = MetFiles.Count() - 1;
