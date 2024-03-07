@@ -42,6 +42,8 @@ namespace LGTracer
 
         private List<double[]> PressureHistory;
 
+        private List<double[]> AgeHistory;
+        
         private List<double[]> TemperatureHistory;
 
         private List<double[]> SpecificHumidityHistory;
@@ -105,6 +107,7 @@ namespace LGTracer
             XHistory = [];
             YHistory = [];
             PressureHistory = [];
+            AgeHistory = [];
             UIDHistory = [];
 
             TemperatureHistory = [];
@@ -260,6 +263,7 @@ namespace LGTracer
             double[,] temperature2D = new double[nTimes, nPoints];
             double[,] specificHumidity2D = new double[nTimes, nPoints];
             double[,] relativeHumidityLiquid2D = new double[nTimes, nPoints];
+            double[,] age2D = new double[nTimes, nPoints];
             uint[,] UIDs = new uint[nTimes, nPoints];
             int nCurrent;
 
@@ -273,6 +277,7 @@ namespace LGTracer
                         x2D[i,j] = XHistory[i][j];
                         y2D[i,j] = YHistory[i][j];
                         p2D[i,j] = PressureHistory[i][j];
+                        age2D[i,j] = AgeHistory[i][j];
                         temperature2D[i,j] = TemperatureHistory[i][j];
                         specificHumidity2D[i,j] = SpecificHumidityHistory[i][j];
                         relativeHumidityLiquid2D[i,j] = RelativeHumidityLiquidHistory[i][j];
@@ -283,6 +288,7 @@ namespace LGTracer
                         x2D[i,j] = double.NaN;
                         y2D[i,j] = double.NaN;
                         p2D[i,j] = double.NaN;
+                        age2D[i,j] = double.NaN;
                         temperature2D[i,j] = double.NaN;
                         specificHumidity2D[i,j] = double.NaN;
                         relativeHumidityLiquid2D[i, j] = double.NaN;
@@ -299,6 +305,7 @@ namespace LGTracer
                 ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "pressure", p2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "temperature", temperature2D, ["time","index"]);
+                ds.AddVariable(typeof(double), "age", age2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "specific_humidity", specificHumidity2D, ["time","index"]);
                 ds.AddVariable(typeof(double), "relative_humidity_liquid", relativeHumidityLiquid2D, ["time","index"]);
                 ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
@@ -312,6 +319,7 @@ namespace LGTracer
         {
             MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
             long nPoints = NActive;
+            double[] ages                         = new double[nPoints];
             double[] xPoints                      = new double[nPoints];
             double[] yPoints                      = new double[nPoints];
             double[] pressurePoints               = new double[nPoints];
@@ -322,6 +330,7 @@ namespace LGTracer
             long i=0;
             foreach (LGPoint point in ActivePoints)
             {
+                ages[i] = point.Age;
                 xPoints[i] = point.X;
                 yPoints[i] = point.Y;
                 pressurePoints[i] = point.Pressure;
@@ -339,6 +348,7 @@ namespace LGTracer
             SpecificHumidityHistory.Add(specificHumidityPoints);
             RelativeHumidityLiquidHistory.Add(relativeHumidityLiquidPoints);
             UIDHistory.Add(UIDs);
+            AgeHistory.Add(ages);
         }
     }
 }
