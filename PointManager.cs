@@ -250,7 +250,7 @@ namespace LGTracer
             };
 
             // Get the output sizes
-            long nPoints = MaxStoredPoints;//Math.Min(MaxStoredPoints,XHistory[0].Length);
+            long nPoints = MaxStoredPoints;
             int nTimes = TimeHistory.Count;
 
             long[] index = new long[nPoints];
@@ -263,9 +263,6 @@ namespace LGTracer
             double[,] x2D = new double[nTimes, nPoints];
             double[,] y2D = new double[nTimes, nPoints];
             double[,] p2D = new double[nTimes, nPoints];
-            //double[,] temperature2D = new double[nTimes, nPoints];
-            //double[,] specificHumidity2D = new double[nTimes, nPoints];
-            //double[,] relativeHumidityLiquid2D = new double[nTimes, nPoints];
             double[,] age2D = new double[nTimes, nPoints];
             uint[,] UIDs = new uint[nTimes, nPoints];
             int nProperties = PropertyNames.Count();
@@ -356,6 +353,8 @@ namespace LGTracer
                 xPoints[i] = point.X;
                 yPoints[i] = point.Y;
                 pressurePoints[i] = point.Pressure;
+                // It would be better here to register the get methods at manager initialization, but
+                // that may not be straightforward
                 for (int k = 0; k < nProperties; k++)
                 {
                     properties[k][i] = point.GetProperty(PropertyNames[k]);
