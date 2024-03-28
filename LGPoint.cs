@@ -35,6 +35,8 @@ namespace LGTracer
         public double TotalWaterContent => IceWaterContent + LiquidWaterContent + SpecificHumidity;
 
         public double RelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, SpecificHumidity);
+        
+        public double RelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, SpecificHumidity);
 
         public double Age
         { get; protected set; }
@@ -94,6 +96,27 @@ namespace LGTracer
             this.Temperature = double.NaN;
             this.SpecificHumidity = double.NaN;
             this.Age = double.NaN;
+        }
+
+        public double GetProperty(string property)
+        {
+            // Hard code for now - the more flexible this is made, the slower it will get
+            switch (property.ToLower().Replace("_",""))
+            {
+                case "temperature":
+                    return Temperature;
+                case "specifichumidity":
+                case "qv":
+                    return SpecificHumidity;
+                case "relativehumidityliquid":
+                case "rhl":
+                    return RelativeHumidityLiquid;
+                case "relativehumidityice":
+                case "rhi":
+                    return RelativeHumidityIce;
+                default:
+                    throw new ArgumentException($"No property for LGPoint called {property}");
+            }
         }
 
         public void SetTemperature( double value )

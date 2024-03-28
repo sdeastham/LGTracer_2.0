@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using MathNet.Numerics.Random;
 
-using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -57,40 +56,60 @@ namespace LGTracer
             int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
             double tStorage = tStart; // Next time that we want storage to occur
             double tReport = tStart; // Next time we want output to go to the user
-
-            // Central RNG for random point seeding
-            System.Random RNG;
-            if (configOptions.Seed != null)
-            {
-                // Use this if debugging
-                RNG = new SystemRandomSource((int)configOptions.Seed);
-            }
-            else
-            {
-                RNG = SystemRandomSource.Default;
-            }
             
             List<PointManager> pointManagers = [];
 
+            // Which point properties will we output?
+            string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
+            
+            // Use a master RNG to generate seeds predictably
+            System.Random masterRNG;
+            if (configOptions.Seed != null)
+            {
+                // Use this if debugging
+                masterRNG = new SystemRandomSource((int)configOptions.Seed);
+            }
+            else
+            {
+                masterRNG = SystemRandomSource.Default;
+            }
+            List<int> seedsUsed = [];
+            
             for (int i = 0; i < 1; i++)
             {
+                // Dense point managers need an RNG for random point seeding
+                // This approach is designed to avoid two failure modes:
+                // * The relationship between successive managers being consistent (avoided by using a master RNG)
+                // * Seeds being reused (avoided by generating until you hit a new seed)
+                // The generation-until-new-seed is in theory slow but that would only matter if we were generating
+                // a large number (>>>10) of dense point managers, which is not expected to be the case
+                int seed;
+                do { seed = masterRNG.Next(); } while (seedsUsed.Contains(seed));
+                System.Random pmRNG = new SystemRandomSource(seed);
+                seedsUsed.Add(seed);
+                
                 // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                     configOptions.Points.OutputFilename);
-                PointManager pointManager = new PointManager(configOptions.Points.Max, domainManager, outputFileName,
-                    includeCompression: configOptions.Points.AdiabaticCompression);
+                PointManager pointManager = new PointManagerDense(configOptions.Points.Max, domainManager,
+                    outputFileName, includeCompression: configOptions.Points.AdiabaticCompression,
+                    propertyNames: densePropertyNames, rng: pmRNG, kgPerPoint: kgPerPoint);
 
                 // Scatter N points randomly over the domain
                 (double[] xInitial, double[] yInitial, double[] pInitial) =
-                    domainManager.MapRandomToXYP(configOptions.Points.Initial, RNG);
+                    domainManager.MapRandomToXYP(configOptions.Points.Initial, pmRNG);
                 pointManager.CreatePointSet(xInitial, yInitial, pInitial);
                 
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);
 
-                // Add to the list of point managers
+                // Add to the list of _all_ point managers
                 pointManagers.Add(pointManager);
             }
+            
+            // Now add instance point managers - contrail point managers, exhaust point managers...
+            // Current proposed approach will be to do this via logical connections (i.e. one manager handles
+            // all contrails) rather than e.g. one manager per flight
 
             tStorage += dtStorage;
             int nStored = 1;
@@ -113,18 +132,11 @@ namespace LGTracer
                     domainManager.UpdateMeteorology();
                 }
 
-                // If we have enough points available, scatter them evenly over the edges of the domain
-                // WARNING: In testing
                 foreach (PointManager pointManager in pointManagers)
                 {
-                    (double[] xSet, double[] ySet, double[] pSet, pointManager.MassSurplus) =
-                        domainManager.SeedBoundary(kgPerPoint, dt, RNG, pointManager.MassSurplus);
-                    pointManager.CreatePointSet(xSet, ySet, pSet);
-
-                    (double[] xSetV, double[] ySetV, double[] pSetV, pointManager.MassSurplus) =
-                        domainManager.SeedPressureBoundaries(kgPerPoint, dt, RNG, pointManager.MassSurplus);
-                    pointManager.CreatePointSet(xSetV, ySetV, pSetV);
-
+                    // Seed new points
+                    pointManager.Seed(dt);
+                    
                     // Do the actual work
                     pointManager.Advance(dt);
 
