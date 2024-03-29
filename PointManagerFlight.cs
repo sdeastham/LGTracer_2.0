@@ -9,16 +9,15 @@ public class PointManagerFlight : PointManager
 {
     protected LinkedList<FlightSegment> FlightSegments;
     protected DateTime LastSeedTime;
-    protected System.Random Rng;
     protected Dictionary<string,LinkedList<FlightSegment>> FlightTable;
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
-        System.Random rng, bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
+        bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
         double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, debug, includeCompression, propertyNames)
     {
         FlightSegments = [];
         LastSeedTime = initialSeedTime;
-        Rng = rng;
+        FlightTable = [];
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
@@ -258,6 +257,8 @@ public class FlightSegment
                 seedList.Add(node.Value);
                 Waypoints.Remove(node);
             }
+
+            node = nextNode;
         }
         return seedList.ToArray();
     }

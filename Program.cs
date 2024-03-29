@@ -61,6 +61,7 @@ namespace LGTracer
 
             // Which point properties will we output?
             string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
+            string[] flightPropertyNames = ["temperature", "relative_humidity_ice"];
             
             // Use a master RNG to generate seeds predictably
             System.Random masterRNG;
@@ -107,9 +108,38 @@ namespace LGTracer
                 pointManagers.Add(pointManager);
             }
             
-            // Now add instance point managers - contrail point managers, exhaust point managers...
+            // Now add plume point managers - contrail point managers, exhaust point managers...
             // Current proposed approach will be to do this via logical connections (i.e. one manager handles
             // all contrails) rather than e.g. one manager per flight
+            for (int i = 0; i < 1; i++)
+            {
+                
+                // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
+                string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
+                    configOptions.Points.OutputFilename);
+                PointManagerFlight pointManager = new PointManagerFlight(configOptions.Points.Max, domainManager,
+                    outputFileName,startDate, 
+                    includeCompression: configOptions.Points.AdiabaticCompression,
+                    propertyNames: densePropertyNames, kgPerPoint: kgPerPoint);
+                
+                // Add some flights [TESTING]
+                double machOneKPH = (3600.0/1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);
+                double lonBOS = -1.0*(71.0 +  0.0 / 60.0 + 23.0 / 3600.0 );
+                double latBOS =       42.0 + 21.0 / 60.0 + 47.0 / 3600.0;
+                double lonLHR = -1.0*( 0.0 + 27.0 / 60.0 + 41.0 / 3600.0 );
+                double latLHR =       51.0 + 28.0 / 60.0 + 39.0 / 3600.0;
+                double cruiseSpeedKPH = machOneKPH * 0.8;
+                pointManager.SimulateFlight(lonBOS,latBOS,lonLHR,latLHR,startDate,
+                    cruiseSpeedKPH,flightLabel: $"BOS_LHR_{startDate}_{endDate}");
+                pointManager.SimulateFlight(lonLHR,latLHR,lonBOS,latBOS,startDate,
+                    cruiseSpeedKPH,flightLabel: $"LHR_BOS_{startDate}_{endDate}");
+                
+                // Store initial conditions
+                pointManager.ArchiveConditions(tCurr);
+
+                // Add to the list of _all_ point managers
+                pointManagers.Add((PointManager)pointManager);
+            }
 
             tStorage += dtStorage;
             int nStored = 1;
