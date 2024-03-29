@@ -217,7 +217,7 @@ namespace LGTracer
             }
         }
 
-        public void Cull()
+        public virtual void Cull()
         {
             // Deactivate any points which are outside the domain
             LinkedListNode<LGPoint>? node = ActivePoints.First;

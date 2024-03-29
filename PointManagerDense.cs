@@ -7,7 +7,9 @@ namespace LGTracer
         private System.Random Rng;
         private double KgPerPoint;
 
-        public PointManagerDense( long? maxPoints, DomainManager domain, string filename, bool debug=false, bool includeCompression=false, string[]? propertyNames=null, System.Random? rng=null, double kgPerPoint=1.0e12 ) : base(maxPoints,domain,filename,debug,includeCompression,propertyNames)
+        public PointManagerDense( long? maxPoints, DomainManager domain, string filename, bool debug=false, 
+            bool includeCompression=false, string[]? propertyNames=null, System.Random? rng=null,
+            double kgPerPoint=1.0e12 ) : base(maxPoints,domain,filename,debug,includeCompression,propertyNames)
         {
             // No initial mass surplus
             MassSurplus = 0.0;
