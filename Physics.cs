@@ -1,7 +1,17 @@
-﻿namespace LGTracer
+﻿using AtmosTools;
+
+namespace LGTracer
 {
     public class Physics
     {
+        
+        private const double WaterMolarMass = 18.01528 * 1.0e-3; // kg/mol
+        private const double AirMolarMass = 28.964 * 1.0e-3; // kg/mol
+        private const double WaterMolarConversion = AirMolarMass / WaterMolarMass;
+        public const double RGasUniversal = AtmosTools.PhysConstants.RGasUniversal; // J/K/mol
+        public const double G0 = AtmosTools.PhysConstants.G0; // m/s2
+        public const double Avogadro = AtmosTools.PhysConstants.Avogadro; // molec/mol
+        
         public static double SaturationPressureLiquid(double temperature)
         {
             /*
@@ -42,10 +52,6 @@
                                     - 1.3198825E-5 * temperature * temperature
                                     - 0.49382577 * Math.Log( temperature ) );
         }
-
-        private const double WaterMolarMass = 18.01528 * 1.0e-3; // kg/mol
-        private const double AirMolarMass = 28.964 * 1.0e-3; // kg/mol
-        private const double WaterMolarConversion = AirMolarMass / WaterMolarMass;
         
         public static double RelativeHumidityLiquid(double temperature, double pressure, double specificHumidity)
         {
