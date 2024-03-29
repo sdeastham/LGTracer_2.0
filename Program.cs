@@ -114,14 +114,30 @@ namespace LGTracer
             {
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                     configOptions.PointsFlights.OutputFilename);
+                double pointPeriod = configOptions.PointsFlights.PointSpacing;
                 PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                    outputFileName, startDate,
+                    outputFileName, startDate, pointPeriod,
                     includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                     propertyNames: densePropertyNames);
 
-                double pointPeriod = configOptions.PointsFlights.PointSpacing;
+                if (configOptions.PointsFlights.ScheduleFilename != null)
+                {
+                    Debug.Assert(configOptions.PointsFlights.AirportsFilename != null,
+                        "No airport file provided");
+                    string scheduleFileName = Path.Join(configOptions.InputOutput.InputDirectory,
+                        configOptions.PointsFlights.ScheduleFilename);
+                    string airportFileName = Path.Join(configOptions.InputOutput.InputDirectory,
+                        configOptions.PointsFlights.AirportsFilename);
+                    pointManager.ReadScheduleFile(scheduleFileName,airportFileName);
+                }
+                
+                if (configOptions.PointsFlights.SegmentsFilename != null)
+                {
+                    pointManager.ReadSegmentsFile(configOptions.PointsFlights.SegmentsFilename);
+                }
 
                 // Add some flights [TESTING]
+                /*
                 double machOneKPH = (3600.0 / 1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);
                 double lonBOS = -1.0 * (71.0 + 0.0 / 60.0 + 23.0 / 3600.0);
                 double latBOS = 42.0 + 21.0 / 60.0 + 47.0 / 3600.0;
@@ -132,6 +148,7 @@ namespace LGTracer
                     cruiseSpeedKPH, flightLabel: $"BOS_LHR_{startDate}_{endDate}", pointPeriod: pointPeriod);
                 pointManager.SimulateFlight(lonLHR, latLHR, lonBOS, latBOS, startDate,
                     cruiseSpeedKPH, flightLabel: $"LHR_BOS_{startDate}_{endDate}", pointPeriod: pointPeriod);
+                */
                 
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);

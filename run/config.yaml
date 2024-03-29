@@ -16,6 +16,9 @@
     kg-per-point: 2.0e14
     output-filename: dense-points.nc
  points-flights:
+    schedule-filename: "schedule.csv"
+    airports-filename: "airports.csv"
+    segments-filename: null
     max: null
     adiabatic-compression: true
     output-filename: flight-tracks.nc
@@ -29,6 +32,7 @@
  input-output:
    met-directory: "C:/Data/MERRA-2"
    output-directory: "C:/Data/LGTracer/output"
+   input-directory: "C:/Data/LGTracer/input"
  # Use null for the default (system clock)
  seed: 481301
  # Update meteorology over time?

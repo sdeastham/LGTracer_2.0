@@ -59,7 +59,7 @@
         public string OutputFilename = "default_output.nc";
 
         public bool Active => (Max == null || Max > 0);
-    }1
+    }
     public class LGOptionsPointsDense : LGOptionsPoints
     {
         public long Initial = 0;
@@ -68,7 +68,9 @@
     
     public class LGOptionsPointsFlights : LGOptionsPoints
     {
-        // Nothing yet
+        public string? ScheduleFilename = null;
+        public string? AirportsFilename = null;
+        public string? SegmentsFilename = null;
         public double PointSpacing = 60.0; // Seconds
     }
 
@@ -88,5 +90,6 @@
     {
         public string MetDirectory = "";
         public string OutputDirectory = "";
+        public string InputDirectory = "";
     }
 }

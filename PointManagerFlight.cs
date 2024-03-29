@@ -1,6 +1,6 @@
-﻿using System.Collections;
-using System.Diagnostics;
-using System.Xml.Serialization;
+﻿using System.Diagnostics;
+using System.Globalization;
+using Microsoft.VisualBasic.FileIO; // For parsing CSVs
 using AtmosTools;
 
 namespace LGTracer;
@@ -10,14 +10,17 @@ public class PointManagerFlight : PointManager
     protected LinkedList<FlightSegment> FlightSegments;
     protected DateTime LastSeedTime;
     protected Dictionary<string,LinkedList<FlightSegment>> FlightTable;
+    protected double PointPeriod;
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
+        double pointPeriod,
         bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
         double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, debug, includeCompression, propertyNames)
     {
         FlightSegments = [];
         LastSeedTime = initialSeedTime;
         FlightTable = [];
+        PointPeriod = pointPeriod;
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
@@ -168,6 +171,82 @@ public class PointManagerFlight : PointManager
             node = nextNode;
         }
         // TODO: Go through subsegments and see if any have lost their head or tail
+    }
+
+    public void ReadSegmentsFile(string segmentsFilePath)
+    {
+        throw new NotImplementedException("Segment file reading not yet implemented");
+    }
+    public void ReadScheduleFile(string scheduleFilePath, string airportFilePath)
+    {
+        // First read in the airport data file
+        //List<Airport> airports = [];
+        Dictionary<string, Airport> airports = [];
+        using (TextFieldParser csvParser = new TextFieldParser(airportFilePath))
+        {
+            csvParser.CommentTokens = ["#"];
+            csvParser.SetDelimiters([","]);
+            csvParser.HasFieldsEnclosedInQuotes = true;
+            
+            // Get the columns
+            string [] colNames = csvParser.ReadFields();
+            int icaoIndex = Array.IndexOf(colNames, "ICAO name");
+            int iataIndex = Array.IndexOf(colNames, "IATA name");
+            int latIndex = Array.IndexOf(colNames, "Latitude");
+            int lonIndex = Array.IndexOf(colNames, "Longitude");
+
+            while (!csvParser.EndOfData)
+            {
+                string[] fields = csvParser.ReadFields();
+                string airportName = fields[iataIndex]; // Use IATA for now
+                airports.Add(airportName,new Airport(double.Parse(fields[lonIndex]),
+                    double.Parse(fields[latIndex]), fields[iataIndex],fields[icaoIndex]));
+            }
+        }
+        
+        // Now the schedule file
+        using (TextFieldParser csvParser = new TextFieldParser(scheduleFilePath))
+        {
+            csvParser.CommentTokens = ["#"];
+            csvParser.SetDelimiters([","]);
+            csvParser.HasFieldsEnclosedInQuotes = true;
+            
+            // Get the columns
+            string [] colNames = csvParser.ReadFields();
+            int originIndex = Array.IndexOf(colNames, "Origin airport");
+            int destinationIndex = Array.IndexOf(colNames, "Destination airport");
+            int dateIndex = Array.IndexOf(colNames, "Takeoff date");
+            int timeIndex = Array.IndexOf(colNames, "Takeoff time");
+            // Also Airline and Equipment, but not currently used
+
+            // Not entirely sure why this is needed
+            CultureInfo cultureInfo = new CultureInfo("en-US");
+            while (!csvParser.EndOfData)
+            {
+                string[] fields = csvParser.ReadFields();
+                string origin = fields[originIndex];
+                string destination = fields[destinationIndex];
+                Airport originAirport = airports[origin];
+                Airport destinationAirport = airports[destination];
+                if (originAirport == destinationAirport) { continue; }
+                // Build a full date/time string
+                string dtFull = $"{fields[dateIndex]} {fields[timeIndex]}Z";
+                DateTime takeoff = DateTime.ParseExact(dtFull, "u", cultureInfo);
+                // Add flight
+                SimulateFlight(originAirport.Longitude,originAirport.Latitude,
+                    destinationAirport.Longitude,destinationAirport.Latitude,
+                    takeoff,820.0,null,PointPeriod);
+            }
+        }
+    }
+
+    private class Airport(double longitude, double latitude, string nameIATA, string nameICAO, double elevation = 0.0)
+    {
+        public double Longitude = longitude;
+        public double Latitude = latitude;
+        public string NameIATA = nameIATA;
+        public string NameICAO = nameICAO;
+        public double Elevation = elevation;
     }
 }
 
