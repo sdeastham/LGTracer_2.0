@@ -75,7 +75,7 @@ namespace LGTracer
             this.IncludeCompression = includeCompression;
         }
 
-        public void Activate( double x, double y, double pressure, uint uniqueID )
+        public virtual void Activate( double x, double y, double pressure, uint uniqueID )
         {
             // Change the particle from being inactive to active
             this.Active = true;
@@ -86,7 +86,7 @@ namespace LGTracer
             this.Age = 0.0;
         }
 
-        public void Deactivate()
+        public virtual void Deactivate()
         {
             // Kill the particle and put it into storage
             this.Active = false;
