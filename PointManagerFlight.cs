@@ -31,6 +31,18 @@ public class PointManagerFlight : PointManager
             [takeoffTime,endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
     }
 
+    public void PrintFlights()
+    {
+        foreach (FlightSegment segment in FlightSegments)
+        {
+            Console.WriteLine($"Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
+            foreach (FlightSegment.Waypoint waypoint in segment.Waypoints)
+            {
+                Console.WriteLine($" --> Waypoint: {waypoint.Lat,9:f2}N/{waypoint.Lon,9:f2} to deploy at {waypoint.DeploymentTime}");
+            }
+        }
+    }
+
     public void AddFlight(double[] lons, double[] lats, double[] pressureAltitudes, DateTime[] dateTimes,
         string? flightLabel=null, double pointPeriod = 60.0 * 5.0)
     {
@@ -65,7 +77,7 @@ public class PointManagerFlight : PointManager
         {
             double gcd = Geodesy.GreatCircleDistance(lons[i], lats[i], lons[i + 1], lats[i + 1]);
             double segmentDuration = (dateTimes[i + 1] - dateTimes[i]).TotalSeconds;
-            double flightSpeed = gcd / segmentDuration;
+            double flightSpeed = 3600.0 * gcd / segmentDuration;
             AddFlightSegmentOrdered(lats[i], lons[i], dateTimes[i],
                 lats[i + 1], lons[i + 1], dateTimes[i + 1],
                 0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod, flightLabelSafe);
@@ -119,6 +131,7 @@ public class PointManagerFlight : PointManager
 
     public override void Seed(double dt)
     {
+        PrintFlights();
         DateTime endTime = LastSeedTime + TimeSpan.FromSeconds(dt);
         // For each flight segment, check if there are any new seeds which should be created
         foreach (FlightSegment flightSegment in FlightSegments)
@@ -133,6 +146,7 @@ public class PointManagerFlight : PointManager
                 // TODO: Create a segment between the predecessor and this point
                 // TODO: Override LGPoint with LGPlume, which can carry a segment
                 // TODO: Assign the segment to this point
+                // TODO: Allow the point to carry/retrieve segment properties (nested class?)
             }
         }
         LastSeedTime = endTime;
@@ -168,7 +182,7 @@ public class FlightSegment
     // Altitudes are "pressure altitudes", meaning they are the pressure the ISA says corresponds to a given altitude
     private double StartAltitudePa; 
     private double EndAltitudePa;
-    protected readonly LinkedList<Waypoint> Waypoints;
+    public LinkedList<Waypoint> Waypoints { get; protected set; }
     public int WaypointsRemaining => Waypoints.Count;
     public FlightSegment? PreviousSegment;
     public string FlightID { get; private set; }
@@ -191,7 +205,8 @@ public class FlightSegment
         FlightID = flightLabel;
 
         // How far do we want to space the waypoints (in kilometers)?
-        double waypointSpacing = flightSpeed * 3600.0 / pointPeriod;
+        double waypointSpacing = flightSpeed * pointPeriod / 3600.0;
+        Console.WriteLine($"WAYPOINT SPACING: {waypointSpacing} [{flightSpeed} and {pointPeriod}]");
         
         // The waypoints (or seeds) are tracked as a linked list, where we will delete entries as they are dropped.
         // Once the list is empty, the segment can be safely deleted
@@ -223,6 +238,7 @@ public class FlightSegment
             // or from a previous flight segment
             Waypoints.AddLast(new Waypoint(waypointLons[iWaypoint], waypointLats[iWaypoint], cruisePressurePa,
                 waypointTimes[iWaypoint], segmentDistance, iWaypoint == 0));
+            Console.WriteLine($"NEW WAYPOINT: {waypointLats[iWaypoint],8:f2}N/{waypointLons[iWaypoint],8:f2}E at {waypointTimes[iWaypoint]}");
         }
     }
 
@@ -271,14 +287,15 @@ public class FlightSegment
         public double Pressure = pressure;
         public double SegmentDistance = segmentDistance;
         public bool Leader = leader;
+        public DateTime DeploymentTime = deploymentTime;
 
         public bool Deploy(DateTime now)
         {
-            return now < deploymentTime;
+            return DeploymentTime < now;
         }
         public bool Deploy(DateTime startTime, DateTime endTime)
         {
-            return (deploymentTime < endTime && deploymentTime >= startTime);
+            return (DeploymentTime >= startTime && DeploymentTime < endTime);
         }
     }
 }

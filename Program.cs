@@ -133,6 +133,8 @@ namespace LGTracer
                     cruiseSpeedKPH,flightLabel: $"BOS_LHR_{startDate}_{endDate}");
                 pointManager.SimulateFlight(lonLHR,latLHR,lonBOS,latBOS,startDate,
                     cruiseSpeedKPH,flightLabel: $"LHR_BOS_{startDate}_{endDate}");
+
+                pointManager.PrintFlights();
                 
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);
