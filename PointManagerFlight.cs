@@ -131,7 +131,6 @@ public class PointManagerFlight : PointManager
 
     public override void Seed(double dt)
     {
-        PrintFlights();
         DateTime endTime = LastSeedTime + TimeSpan.FromSeconds(dt);
         // For each flight segment, check if there are any new seeds which should be created
         foreach (FlightSegment flightSegment in FlightSegments)
@@ -206,7 +205,6 @@ public class FlightSegment
 
         // How far do we want to space the waypoints (in kilometers)?
         double waypointSpacing = flightSpeed * pointPeriod / 3600.0;
-        Console.WriteLine($"WAYPOINT SPACING: {waypointSpacing} [{flightSpeed} and {pointPeriod}]");
         
         // The waypoints (or seeds) are tracked as a linked list, where we will delete entries as they are dropped.
         // Once the list is empty, the segment can be safely deleted
@@ -238,7 +236,6 @@ public class FlightSegment
             // or from a previous flight segment
             Waypoints.AddLast(new Waypoint(waypointLons[iWaypoint], waypointLats[iWaypoint], cruisePressurePa,
                 waypointTimes[iWaypoint], segmentDistance, iWaypoint == 0));
-            Console.WriteLine($"NEW WAYPOINT: {waypointLats[iWaypoint],8:f2}N/{waypointLons[iWaypoint],8:f2}E at {waypointTimes[iWaypoint]}");
         }
     }
 

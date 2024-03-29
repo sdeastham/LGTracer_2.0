@@ -75,21 +75,18 @@ namespace LGTracer
             }
             List<int> seedsUsed = [];
             
-            for (int i = 0; i < 1; i++)
+            // Dense point managers need an RNG for random point seeding
+            // This approach is designed to avoid two failure modes:
+            // * The relationship between successive managers being consistent (avoided by using a master RNG)
+            // * Seeds being reused (avoided by generating until you hit a new seed)
+            // The generation-until-new-seed is in theory slow but that would only matter if we were generating
+            // a large number (>>>10) of dense point managers, which is not expected to be the case
+            if (configOptions.PointsDense.Active)
             {
-                // Dense point managers need an RNG for random point seeding
-                // This approach is designed to avoid two failure modes:
-                // * The relationship between successive managers being consistent (avoided by using a master RNG)
-                // * Seeds being reused (avoided by generating until you hit a new seed)
-                // The generation-until-new-seed is in theory slow but that would only matter if we were generating
-                // a large number (>>>10) of dense point managers, which is not expected to be the case
-                int seed;
-                do { seed = masterRNG.Next(); } while (seedsUsed.Contains(seed));
-                System.Random pmRNG = new SystemRandomSource(seed);
-                seedsUsed.Add(seed);
-                
+                System.Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
+
                 double kgPerPoint = configOptions.PointsDense.KgPerPoint;
-                
+
                 // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                     configOptions.PointsDense.OutputFilename);
@@ -101,47 +98,51 @@ namespace LGTracer
                 (double[] xInitial, double[] yInitial, double[] pInitial) =
                     domainManager.MapRandomToXYP(configOptions.PointsDense.Initial, pmRNG);
                 pointManager.CreatePointSet(xInitial, yInitial, pInitial);
-                
+
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);
 
                 // Add to the list of _all_ point managers
                 pointManagers.Add(pointManager);
             }
-            
+
             // Now add plume point managers - contrail point managers, exhaust point managers...
             // Current proposed approach will be to do this via logical connections (i.e. one manager handles
             // all contrails) rather than e.g. one manager per flight
-            for (int i = 0; i < 1; i++)
+            // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
+            if (configOptions.PointsFlights.Active)
             {
-                
-                // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                     configOptions.PointsFlights.OutputFilename);
                 PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                    outputFileName,startDate, 
+                    outputFileName, startDate,
                     includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                     propertyNames: densePropertyNames);
-                
-                // Add some flights [TESTING]
-                double machOneKPH = (3600.0/1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);
-                double lonBOS = -1.0*(71.0 +  0.0 / 60.0 + 23.0 / 3600.0 );
-                double latBOS =       42.0 + 21.0 / 60.0 + 47.0 / 3600.0;
-                double lonLHR = -1.0*( 0.0 + 27.0 / 60.0 + 41.0 / 3600.0 );
-                double latLHR =       51.0 + 28.0 / 60.0 + 39.0 / 3600.0;
-                double cruiseSpeedKPH = machOneKPH * 0.8;
-                pointManager.SimulateFlight(lonBOS,latBOS,lonLHR,latLHR,startDate,
-                    cruiseSpeedKPH,flightLabel: $"BOS_LHR_{startDate}_{endDate}");
-                pointManager.SimulateFlight(lonLHR,latLHR,lonBOS,latBOS,startDate,
-                    cruiseSpeedKPH,flightLabel: $"LHR_BOS_{startDate}_{endDate}");
 
-                pointManager.PrintFlights();
+                double pointPeriod = configOptions.PointsFlights.PointSpacing;
+
+                // Add some flights [TESTING]
+                double machOneKPH = (3600.0 / 1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);
+                double lonBOS = -1.0 * (71.0 + 0.0 / 60.0 + 23.0 / 3600.0);
+                double latBOS = 42.0 + 21.0 / 60.0 + 47.0 / 3600.0;
+                double lonLHR = -1.0 * (0.0 + 27.0 / 60.0 + 41.0 / 3600.0);
+                double latLHR = 51.0 + 28.0 / 60.0 + 39.0 / 3600.0;
+                double cruiseSpeedKPH = machOneKPH * 0.8;
+                pointManager.SimulateFlight(lonBOS, latBOS, lonLHR, latLHR, startDate,
+                    cruiseSpeedKPH, flightLabel: $"BOS_LHR_{startDate}_{endDate}", pointPeriod: pointPeriod);
+                pointManager.SimulateFlight(lonLHR, latLHR, lonBOS, latBOS, startDate,
+                    cruiseSpeedKPH, flightLabel: $"LHR_BOS_{startDate}_{endDate}", pointPeriod: pointPeriod);
                 
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);
 
                 // Add to the list of _all_ point managers
                 pointManagers.Add((PointManager)pointManager);
+            }
+
+            if (pointManagers.Count == 0)
+            {
+                throw new ArgumentException("No point managers enabled.");
             }
 
             tStorage += dtStorage;
@@ -223,6 +224,15 @@ namespace LGTracer
                 .Build();
 
             return deserializer.Deserialize<LGOptions>(yaml);
+        }
+        
+        private static System.Random GetNextRNG(System.Random masterRNG, List<int> seedsUsed)
+        {
+            int seed;
+            do { seed = masterRNG.Next(); } while (seedsUsed.Contains(seed));
+            System.Random pmRNG = new SystemRandomSource(seed);
+            seedsUsed.Add(seed);
+            return pmRNG;
         }
     }
 }

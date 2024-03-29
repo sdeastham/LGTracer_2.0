@@ -54,10 +54,12 @@
 
     public abstract class LGOptionsPoints
     {
-        public long? Max = null;
+        public long? Max = 0;
         public bool AdiabaticCompression = true;
         public string OutputFilename = "default_output.nc";
-    }
+
+        public bool Active => (Max == null || Max > 0);
+    }1
     public class LGOptionsPointsDense : LGOptionsPoints
     {
         public long Initial = 0;
@@ -67,6 +69,7 @@
     public class LGOptionsPointsFlights : LGOptionsPoints
     {
         // Nothing yet
+        public double PointSpacing = 60.0; // Seconds
     }
 
     public class LGOptionsDomain
