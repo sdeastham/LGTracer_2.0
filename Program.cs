@@ -31,7 +31,6 @@ namespace LGTracer
             double[] latLims = configOptions.Domain.LatLimits;
             double[] pLims   = [configOptions.Domain.PressureBase * 100.0,
                                 configOptions.Domain.PressureCeiling * 100.0];
-            double kgPerPoint = configOptions.Points.KgPerPoint;
 
             // Major simulation settings
             DateTime startDate = configOptions.Timing.StartDate;
@@ -89,16 +88,18 @@ namespace LGTracer
                 System.Random pmRNG = new SystemRandomSource(seed);
                 seedsUsed.Add(seed);
                 
+                double kgPerPoint = configOptions.PointsDense.KgPerPoint;
+                
                 // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
-                    configOptions.Points.OutputFilename);
-                PointManager pointManager = new PointManagerDense(configOptions.Points.Max, domainManager,
-                    outputFileName, includeCompression: configOptions.Points.AdiabaticCompression,
+                    configOptions.PointsDense.OutputFilename);
+                PointManager pointManager = new PointManagerDense(configOptions.PointsDense.Max, domainManager,
+                    outputFileName, includeCompression: configOptions.PointsDense.AdiabaticCompression,
                     propertyNames: densePropertyNames, rng: pmRNG, kgPerPoint: kgPerPoint);
 
                 // Scatter N points randomly over the domain
                 (double[] xInitial, double[] yInitial, double[] pInitial) =
-                    domainManager.MapRandomToXYP(configOptions.Points.Initial, pmRNG);
+                    domainManager.MapRandomToXYP(configOptions.PointsDense.Initial, pmRNG);
                 pointManager.CreatePointSet(xInitial, yInitial, pInitial);
                 
                 // Store initial conditions
@@ -116,11 +117,11 @@ namespace LGTracer
                 
                 // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
                 string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
-                    configOptions.Points.OutputFilename);
-                PointManagerFlight pointManager = new PointManagerFlight(configOptions.Points.Max, domainManager,
+                    configOptions.PointsFlights.OutputFilename);
+                PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
                     outputFileName,startDate, 
-                    includeCompression: configOptions.Points.AdiabaticCompression,
-                    propertyNames: densePropertyNames, kgPerPoint: kgPerPoint);
+                    includeCompression: configOptions.PointsFlights.AdiabaticCompression,
+                    propertyNames: densePropertyNames);
                 
                 // Add some flights [TESTING]
                 double machOneKPH = (3600.0/1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);

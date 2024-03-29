@@ -8,13 +8,17 @@
    # Diagnostic and output (minutes)
    reporting: 180.0
    storage: 5.0
- points:
+ points-dense:
     max: null
-    initial: 15000
+    initial: 1500
     # Calculate delta T due to pressure change?
     adiabatic-compression: true
-    kg-per-point: 2.0e13
-    output-filename: output.nc
+    kg-per-point: 2.0e14
+    output-filename: dense-points.nc
+ points-flights:
+    max: null
+    adiabatic-compression: true
+    output-filename: flight-tracks.nc
  domain:
    east-limit: -80.0
    west-limit: 15.0

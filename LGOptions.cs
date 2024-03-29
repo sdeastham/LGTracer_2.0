@@ -8,7 +8,10 @@
         public LGOptionsTimesteps Timesteps
         { get; private set; }
         
-        public LGOptionsPoints Points
+        public LGOptionsPointsDense PointsDense
+        { get; private set; }
+        
+        public LGOptionsPointsFlights PointsFlights
         { get; private set; }
         
         public LGOptionsDomain Domain
@@ -27,7 +30,8 @@
 
         public LGOptions()
         {
-            Points = new LGOptionsPoints();
+            PointsDense = new LGOptionsPointsDense();
+            PointsFlights = new LGOptionsPointsFlights();
             Domain = new LGOptionsDomain();
             Timesteps = new LGOptionsTimesteps();
             Timing = new LGOptionsTiming();
@@ -47,14 +51,22 @@
         public double Reporting = 3600.0;
         public double Storage = 3600.0;
     }
-    
-    public class LGOptionsPoints
+
+    public abstract class LGOptionsPoints
     {
         public long? Max = null;
-        public long Initial = 0;
         public bool AdiabaticCompression = true;
-        public double KgPerPoint = 1.0e16;
         public string OutputFilename = "default_output.nc";
+    }
+    public class LGOptionsPointsDense : LGOptionsPoints
+    {
+        public long Initial = 0;
+        public double KgPerPoint = 1.0e16;
+    }
+    
+    public class LGOptionsPointsFlights : LGOptionsPoints
+    {
+        // Nothing yet
     }
 
     public class LGOptionsDomain
