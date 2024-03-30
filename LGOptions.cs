@@ -72,6 +72,7 @@
         public string? AirportsFilename = null;
         public string? SegmentsFilename = null;
         public double PointSpacing = 60.0; // Seconds
+        public string SegmentsOutputFilename = "segments_output.nc";
     }
 
     public class LGOptionsDomain

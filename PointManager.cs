@@ -234,11 +234,11 @@ namespace LGTracer
             }
         }
 
-        public bool WriteToFile()
+        public virtual bool WriteToFile()
         {
             return WriteToFile(OutputFilename);
         }
-        public bool WriteToFile(string fileName)
+        private bool WriteToFile(string fileName)
         {
             bool success = true;
 
@@ -330,7 +330,7 @@ namespace LGTracer
             return success;
         }
 
-        public void ArchiveConditions(double tCurr)
+        public virtual void ArchiveConditions(double tCurr)
         {
             MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
             long nPoints = NActive;

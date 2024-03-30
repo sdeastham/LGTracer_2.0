@@ -21,7 +21,8 @@
     segments-filename: null
     max: null
     adiabatic-compression: true
-    output-filename: flight-tracks.nc
+    output-filename: flight-waypoints.nc
+    segments-output-filename: flight-segments.nc
  domain:
    east-limit: -80.0
    west-limit: 15.0

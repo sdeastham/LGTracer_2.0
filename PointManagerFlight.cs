@@ -11,9 +11,10 @@ public class PointManagerFlight : PointManager
     protected DateTime LastSeedTime;
     protected Dictionary<string,LinkedList<FlightSegment>> FlightTable;
     protected double PointPeriod;
+    public string SegmentsOutputFilename { get; protected set; }
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
-        double pointPeriod,
+        double pointPeriod, string segmentsOutputFilename,
         bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
         double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, debug, includeCompression, propertyNames)
     {
@@ -21,6 +22,7 @@ public class PointManagerFlight : PointManager
         LastSeedTime = initialSeedTime;
         FlightTable = [];
         PointPeriod = pointPeriod;
+        SegmentsOutputFilename = segmentsOutputFilename;
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
@@ -240,6 +242,14 @@ public class PointManagerFlight : PointManager
         }
     }
 
+    public override bool WriteToFile()
+    {
+        bool pointFileSuccess = base.WriteToFile();
+        // Also write segments to file!
+        bool segmentFileSuccess = true;
+        return (segmentFileSuccess && pointFileSuccess);
+    }
+
     private class Airport(double longitude, double latitude, string nameIATA, string nameICAO, double elevation = 0.0)
     {
         public double Longitude = longitude;
@@ -290,8 +300,8 @@ public class FlightSegment
         
         // Calculate how many points we will need to seed, when they should be seeded, and where
         // Get the locations of the seeds
-        (double[] waypointLons, double[] waypointLats, double[] initialSubsegmentLengths) = Geodesy.GreatCircleWaypoints(startLongitude,
-            startLatitude, endLongitude, endLatitude, waypointSpacing);
+        (double[] waypointLons, double[] waypointLats, double[] initialSubsegmentLengths) = 
+            Geodesy.GreatCircleWaypointsByLength(startLongitude, startLatitude, endLongitude, endLatitude, waypointSpacing);
         int nWaypoints = waypointLons.Length;
         // Something to track which seeds have been dropped
         // Now the times at which the seeds should be created

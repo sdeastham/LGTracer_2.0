@@ -98,7 +98,7 @@ namespace LGTracer
             this.Age = double.NaN;
         }
 
-        public double GetProperty(string property)
+        public virtual double GetProperty(string property)
         {
             // Hard code for now - the more flexible this is made, the slower it will get
             switch (property.ToLower().Replace("_",""))
@@ -129,7 +129,7 @@ namespace LGTracer
             this.SpecificHumidity = value;
         }
 
-        public void Advance( double dt )
+        public virtual void Advance( double dt )
         {
             if (!Active)
             {

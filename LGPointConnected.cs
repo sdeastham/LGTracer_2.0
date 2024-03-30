@@ -7,7 +7,8 @@ public class LGPointConnected(
     bool includeCompression = false)
     : LGPoint(vCalc, includeCompression)
 {
-    /* LGPointConnected objects are intended to represent vertices along a chain of points, e.g. representing a
+    /*
+     LGPointConnected objects are intended to represent vertices along a chain of points, e.g. representing a
      trajectory  
      These have two major differences from standard LGPoints:
      - Each is associated with a predecessor point (if one exists)
@@ -15,7 +16,7 @@ public class LGPointConnected(
     */
     private LGPointConnected? Previous;
     private LGPointConnected? Next;
-    //private LGSegment? Segment;
+    private LGSegment? Segment;
 
     public void Activate(double x, double y, double pressure, uint uniqueID, LGPointConnected? predecessor)
     {
@@ -50,20 +51,26 @@ public class LGPointConnected(
 
     public void CreateSegment()
     {
-        if (Previous == null)
-        {
-            return;
-        }
-        //Debug.Assert(Segment != null,"Segment already exists");
+        if (Previous == null) { return; }
+        Debug.Assert(Segment != null,"Segment already exists");
         // Create segment and associate it to this class
+        Segment = new LGSegment(this,Previous);
     }
 
     public void DestroySegment()
     {
-        if (Previous == null)
-        {
-            return;
-        }
+        if (Previous == null) { return; }
         // Delete the segment
+        Segment = null;
+    }
+
+    public override void Advance(double dt)
+    {
+        base.Advance(dt);
+        // Segments advance once both the head and tail indicate that they are updated
+        // Update the segment we own (are head of) if not null
+        Segment?.Advance(this);
+        // If we are tail of a segment, also update that
+        Next?.Segment?.Advance(this);
     }
 }

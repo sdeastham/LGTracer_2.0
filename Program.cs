@@ -116,7 +116,7 @@ namespace LGTracer
                     configOptions.PointsFlights.OutputFilename);
                 double pointPeriod = configOptions.PointsFlights.PointSpacing;
                 PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                    outputFileName, startDate, pointPeriod,
+                    outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
                     includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                     propertyNames: densePropertyNames);
 
