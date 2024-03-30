@@ -12,8 +12,28 @@ public class LGSegment
     public double SegmentLength { get; protected set; }
     private bool HeadUpdated;
     private bool TailUpdated;
-    public double XMidpoint { get; protected set; }
-    public double YMidpoint { get; protected set; }
+    
+    // Avoid unnecessary recalculations
+    private double _XMidpoint;
+    public double XMidpoint
+    {
+        get
+        {
+            UpdateProperties();
+            return _XMidpoint;
+        }
+    }
+
+    private double _YMidpoint;
+    public double YMidpoint
+    {
+        get
+        {
+            UpdateProperties();
+            return _YMidpoint;
+        }
+    }
+    protected bool Stale { get; private set; }
     
     public LGSegment(LGPointConnected head, LGPointConnected tail)
     {
@@ -23,6 +43,7 @@ public class LGSegment
         InitialSegmentLength = SegmentLength;
         HeadUpdated = false;
         TailUpdated = false;
+        Stale = false;
     }
 
     public void Advance(LGPointConnected source)
@@ -38,7 +59,8 @@ public class LGSegment
         }
         if (!(HeadUpdated && TailUpdated)) { return; }
 
-        UpdateProperties();
+        // Properties will need to be updated
+        Stale = true;
         
         // Prepare for the next time step
         HeadUpdated = false;
@@ -47,11 +69,14 @@ public class LGSegment
 
     private void UpdateProperties()
     {
+        // If the properties are still up to date,
+        // don't bother re-calculating (expensive!)
+        if (!Stale) return;
         // Update the segment's length
         CalculateSegmentLength();
-        
         // Update the midpoint
         CalculateSegmentMidpoint();
+        Stale = false;
     }
 
     private void CalculateSegmentLength()
@@ -59,12 +84,12 @@ public class LGSegment
         SegmentLength = Geodesy.GreatCircleDistance(Head.X, Head.Y, Tail.X, Tail.Y);
     }
 
-    public void CalculateSegmentMidpoint()
+    private void CalculateSegmentMidpoint()
     {
         // Get the midpoint
         (double[] lons, double[] lats, double[] lengths) = Geodesy.GreatCircleWaypointsByCount(Tail.X, Tail.Y,
             Head.X, Head.Y, 3);
-        XMidpoint = lons[1];
-        YMidpoint = lats[1];
+        _XMidpoint = lons[1];
+        _YMidpoint = lats[1];
     }
 }
