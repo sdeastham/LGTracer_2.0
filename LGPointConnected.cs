@@ -52,7 +52,7 @@ public class LGPointConnected(
     public void CreateSegment(uint uniqueID, string source)
     {
         if (Previous == null) { return; }
-        Debug.Assert(Segment != null,"Segment already exists");
+        Debug.Assert(Segment == null,"Segment already exists");
         // Create segment and associate it to this class
         Segment = new LGSegment(this,Previous,uniqueID,source);
     }

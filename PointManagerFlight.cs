@@ -7,7 +7,6 @@ namespace LGTracer;
 
 public class PointManagerFlight : PointManager
 {
-    protected LinkedList<FlightSegment> FlightSegments;
     protected DateTime LastSeedTime;
     protected Dictionary<string, Flight> FlightTable;
     protected double PointPeriod;
@@ -18,7 +17,6 @@ public class PointManagerFlight : PointManager
         bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
         double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, debug, includeCompression, propertyNames)
     {
-        FlightSegments = [];
         LastSeedTime = initialSeedTime;
         FlightTable = [];
         PointPeriod = pointPeriod;
@@ -43,13 +41,18 @@ public class PointManagerFlight : PointManager
 
     public void PrintFlights()
     {
-        foreach (FlightSegment segment in FlightSegments)
+        foreach (string flightName in FlightTable.Keys)
         {
-            Console.WriteLine($"Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
-            foreach (FlightSegment.Waypoint waypoint in segment.Waypoints)
+            Flight flight = FlightTable[flightName];
+            Console.WriteLine($"Flight {flightName}");
+            foreach (FlightSegment segment in flight.SegmentList)
             {
-                Console.WriteLine(
-                    $" --> Waypoint: {waypoint.Lat,9:f2}N/{waypoint.Lon,9:f2} to deploy at {waypoint.DeploymentTime}");
+                Console.WriteLine($" --> Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
+                foreach (FlightSegment.Waypoint waypoint in segment.Waypoints)
+                {
+                    Console.WriteLine(
+                        $" ----> Waypoint: {waypoint.Lat,9:f2}N/{waypoint.Lon,9:f2} to deploy at {waypoint.DeploymentTime}");
+                }
             }
         }
     }
@@ -67,7 +70,7 @@ public class PointManagerFlight : PointManager
           - flightLabel         A unique string to identify the flight*
           - pointPeriod         Seconds between seeds to be dropped along the track
 
-          If a flight label is not given then on is generated based on the origin location, end location, start time,
+          If a flight label is not given then one is generated based on the origin location, end location, start time,
           and end time. This should be reasonably reliable as there should be essentially no times that two aircraft
           start from the same point go to the same point at exactly the same times.
 
@@ -75,15 +78,15 @@ public class PointManagerFlight : PointManager
           between two airports either do the simulation properly or give the pressures as being at cruise already.
         */
         int nSegments = lons.Length - 1;
-        string flightLabelSafe;
-        if (flightLabel == null)
+        // Auto-generate a label if one is not provided
+        var flightLabelSafe = flightLabel ?? $"{lons[0]}/{lats[0]}_{lons[nSegments]}/{lats[nSegments]}_{dateTimes[0]}";
+        
+        // Check that we don't already have this flight in the table
+        if (FlightTable.ContainsKey(flightLabelSafe))
         {
-            flightLabelSafe = $"{lons[0]}/{lats[0]}_{lons[nSegments]}/{lats[nSegments]}_{dateTimes[0]}";
+            throw new ArgumentException($"Flight label {flightLabelSafe} duplicated");
         }
-        else
-        {
-            flightLabelSafe = flightLabel;
-        }
+        FlightTable.Add(flightLabelSafe,new Flight());
 
         for (int i = 0; i < nSegments; i++)
         {
@@ -102,17 +105,18 @@ public class PointManagerFlight : PointManager
     {
         // Convenience function - as long as flights are being added in full and their segments are added in order,
         // this will ensure that they are linked together
-        LinkedListNode<FlightSegment>? node = FlightSegments.Last;
+        Flight flight = FlightTable[flightLabel];
+        LinkedListNode<FlightSegment>? node = flight.SegmentList.Last;
         AddFlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
             endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel);
-        if (FlightSegments.Last == null)
+        if (flight.SegmentList.Last == null)
         {
             return;
         }
 
         if ((node != null) && (node.Value.FlightID == flightLabel))
         {
-            FlightSegments.Last!.Value.PreviousSegment = node.Value;
+            flight.SegmentList.Last!.Value.PreviousSegment = node.Value;
         }
     }
 
@@ -133,7 +137,6 @@ public class PointManagerFlight : PointManager
             endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, previousSegment);
         // Remove any waypoints which would already have been deployed
         seg.CullByDatetime(LastSeedTime);
-        FlightSegments.AddLast(seg);
         // Add to the table of flights
         if (!FlightTable.ContainsKey(flightLabel))
         {
@@ -146,21 +149,19 @@ public class PointManagerFlight : PointManager
     public override void Seed(double dt)
     {
         DateTime endTime = LastSeedTime + TimeSpan.FromSeconds(dt);
-        // For each flight segment, check if there are any new seeds which should be created
-        foreach (FlightSegment flightSegment in FlightSegments)
+        foreach (string flightLabel in FlightTable.Keys)
         {
-            FlightSegment.Waypoint[] seedVector = flightSegment.DeploySeeds(LastSeedTime, endTime);
-            foreach (FlightSegment.Waypoint seed in seedVector)
+            Flight flight = FlightTable[flightLabel];
+            // For each flight segment, check if there are any new seeds which should be created
+            foreach (FlightSegment flightSegment in flight.SegmentList)
             {
-                LGPoint newPoint = NextPoint(seed.Lon, seed.Lat, seed.Pressure);
-                LGPointConnected newPointConnected = (LGPointConnected)newPoint;
-                // TODO: Put all of this in the override for NextPoint
-                // TODO: Determine if the new point's predecessor from the same flight exists
-                // TODO: Write a plume segment class which represents a segment length
-                // TODO: Create a segment between the predecessor and this point
-                // TODO: Override LGPoint with LGPlume, which can carry a segment
-                // TODO: Assign the segment to this point
-                // TODO: Allow the point to carry/retrieve segment properties (nested class?)
+                FlightSegment.Waypoint[] seedVector = flightSegment.DeploySeeds(LastSeedTime, endTime);
+                foreach (FlightSegment.Waypoint seed in seedVector)
+                {
+                    LGPointConnected newPoint = (LGPointConnected)NextPoint(seed.Lon, seed.Lat, seed.Pressure);
+                    newPoint.Connect(flight.LastPoint, null, flightLabel);
+                    flight.UpdateLast(newPoint);
+                }
             }
         }
 
@@ -172,23 +173,32 @@ public class PointManagerFlight : PointManager
         // Kill generated points as usual
         base.Cull();
         // Also kill flight segments which are completed
-        LinkedListNode<FlightSegment>? node = FlightSegments.First;
-        while (node != null)
+        foreach (string flightLabel in FlightTable.Keys)
         {
-            LinkedListNode<FlightSegment>? nextNode = node.Next;
-            FlightSegment flightSegment = node.Value;
-            if (flightSegment.WaypointsRemaining == 0)
+            Flight flight = FlightTable[flightLabel];
+            LinkedListNode<FlightSegment>? node = flight.SegmentList.First;
+            while (node != null)
             {
-                FlightSegments.Remove(node);
+                LinkedListNode<FlightSegment>? nextNode = node.Next;
+                FlightSegment flightSegment = node.Value;
+                if (flightSegment.WaypointsRemaining == 0)
+                {
+                    flight.SegmentList.Remove(node);
+                }
+                node = nextNode;
             }
-
-            node = nextNode;
+            // If no segments left, delete the flight from the table
+            if (flight.SegmentList.First == null)
+            {
+                FlightTable.Remove(flightLabel);
+            }
         }
-        // TODO: Go through subsegments and see if any have lost their head or tail
     }
 
     public void ReadSegmentsFile(string segmentsFilePath)
     {
+        // This will be tricky - need to find all the segments for one flight, sort them by generation time,
+        // and then add new flights
         throw new NotImplementedException("Segment file reading not yet implemented");
     }
 
@@ -278,7 +288,12 @@ public class PointManagerFlight : PointManager
     protected class Flight
     {
         public LinkedList<FlightSegment> SegmentList = [];
-        protected LGPointConnected? LastPoint = null;
+        public LGPointConnected? LastPoint { get; protected set; } = null;
+
+        public void UpdateLast(LGPointConnected newPoint)
+        {
+            LastPoint = newPoint;
+        }
     }
 }
 
