@@ -213,7 +213,7 @@ public abstract class PointManager
         // Advances all active points one time step
         foreach (IAdvected point in ActivePoints)
         {
-            point.Advance(dt);
+            point.Advance(dt, Domain);
         }
     }
 
@@ -227,7 +227,10 @@ public abstract class PointManager
             LinkedListNode<IAdvected>? nextNode = node.Next;
             IAdvected point = node.Value;
             (double x, double y, double p) = point.GetLocation();
-            if (x < Domain.XMin || x >= Domain.XMax || y < Domain.YMin || y >= Domain.YMax || p > Domain.PBase || p < Domain.PCeiling )
+            // Multiple possible reasons for invalidity
+            // CheckValid is designed to see if the point is invalid for physics reasons (e.g. it is too diffuse to
+            // track) whereas the domain checks are universal
+            if ((!point.CheckValid()) || x < Domain.XMin || x >= Domain.XMax || y < Domain.YMin || y >= Domain.YMax || p > Domain.PBase || p < Domain.PCeiling )
             {
                 DeactivatePoint(node);
             }

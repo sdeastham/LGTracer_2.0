@@ -91,7 +91,7 @@ public class LGPoint : IAdvected
         throw new ArgumentException($"Property {property} requested but base LGPoints have no properties");
     }
 
-    public virtual void Advance( double dt )
+    public virtual void Advance( double dt, DomainManager domain )
     {
         if (!Active)
         {
@@ -112,4 +112,8 @@ public class LGPoint : IAdvected
         Age += dt;
     }
 
+    public virtual bool CheckValid()
+    {
+        return true;
+    }
 }

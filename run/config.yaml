@@ -33,6 +33,7 @@
                        "segment_tail_x",
                        "segment_tail_y",
                        "segment_tail_p"]
+    contrail-simulation: true
  domain:
    east-limit: -80.0
    west-limit: 15.0

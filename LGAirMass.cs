@@ -62,11 +62,11 @@ public class LGAirMass : LGPoint
         }
     }
 
-    public override void Advance(double dt)
+    public override void Advance(double dt, DomainManager domain)
     {
         if (!Active) return;
         double oldPressure = Pressure;
-        base.Advance(dt);
+        base.Advance(dt, domain);
         // Update temperature based on adiabatic compression
         if (IncludeCompression)
         {

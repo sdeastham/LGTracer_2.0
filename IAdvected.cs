@@ -5,9 +5,10 @@ public interface IAdvected
     public double GetProperty(string property);
     public void Activate( double x, double y, double pressure, uint uniqueID );
     public void Deactivate();
-    public void Advance(double dt);
+    public void Advance(double dt, DomainManager domain);
 
     public (double,double,double) GetLocation();
     public uint GetUID();
     public double GetAge();
+    public bool CheckValid();
 }

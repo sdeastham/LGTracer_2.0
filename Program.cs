@@ -58,10 +58,6 @@ public class Program
             
         List<PointManager> pointManagers = [];
 
-        // Which point properties will we output?
-        //string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
-        //string[] flightsPropertyNames = ["temperature", "relative_humidity_ice","segment_length","segment_stretch","segment_tail_x","segment_tail_y","segment_tail_p"];
-            
         // Use a master RNG to generate seeds predictably
         Random masterRNG;
         if (configOptions.Seed != null)
@@ -111,9 +107,11 @@ public class Program
         {
             string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                 configOptions.PointsFlights.OutputFilename);
+            // TODO: Just pass configOptions.PointsFlights to the point manager!
             double pointPeriod = configOptions.PointsFlights.PointSpacing;
             PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
                 outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
+                contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                 propertyNames: configOptions.PointsFlights.OutputVariables);
 

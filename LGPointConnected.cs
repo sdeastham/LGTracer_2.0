@@ -63,9 +63,10 @@ public class LGPointConnected(
         Segment = null;
     }
 
-    public override void Advance(double dt)
+    public override void Advance(double dt, DomainManager domain)
     {
-        base.Advance(dt);
+        if (!Active) return;
+        base.Advance(dt, domain);
         // Segments advance once both the head and tail indicate that they are updated
         // Update the segment we own (are head of) if not null
         Segment?.Advance(this);

@@ -11,21 +11,30 @@ public class PointManagerFlight : PointManager
     protected Dictionary<string, Flight> FlightTable;
     protected double PointPeriod;
     public string SegmentsOutputFilename { get; protected set; }
+    public bool ContrailSimulation { get; private set; }
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
         bool verboseOutput = false, bool includeCompression = false, string[]? propertyNames = null,
-        double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
+        bool contrailSimulation = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
     {
         LastSeedTime = initialSeedTime;
         FlightTable = [];
         PointPeriod = pointPeriod;
         SegmentsOutputFilename = segmentsOutputFilename;
+        ContrailSimulation = contrailSimulation;
     }
 
-    protected override LGPoint CreatePoint()
+    protected override IAdvected CreatePoint()
     {
-        return new LGPointConnected(VelocityCalc);
+        if (ContrailSimulation)
+        {
+            return new LGContrail(VelocityCalc,IncludeCompression);
+        }
+        else
+        {
+            return new LGPointConnected(VelocityCalc);
+        }
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
