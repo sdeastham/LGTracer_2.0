@@ -1,29 +1,29 @@
-﻿namespace LGTracer
+﻿namespace LGTracer;
+
+public class MetManager
 {
-    public class MetManager
-    {
-        protected List<MetFile> MetFiles;
-        public double[,,] UWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[UIndex]).CurrentData;
+    protected List<MetFile> MetFiles;
+    public double[,,] UWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[UIndex]).CurrentData;
 
-        public double[,,] VWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[VIndex]).CurrentData;
+    public double[,,] VWindXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[VIndex]).CurrentData;
 
-        public double[,,] PressureVelocityXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[OmegaIndex]).CurrentData;
+    public double[,,] PressureVelocityXYP => ((MetData3D)MetFiles[A3DynIndex].DataVariables[OmegaIndex]).CurrentData;
 
-        public double[,] SurfacePressureXY => ((MetData2D)MetFiles[I3Index].DataVariables[PSIndex]).CurrentData;
+    public double[,] SurfacePressureXY => ((MetData2D)MetFiles[I3Index].DataVariables[PSIndex]).CurrentData;
 
-        public double[,,] SpecificHumidityXYP => ((MetData3D)MetFiles[I3Index].DataVariables[QVIndex]).CurrentData; // kg water vapour per kg air
+    public double[,,] SpecificHumidityXYP => ((MetData3D)MetFiles[I3Index].DataVariables[QVIndex]).CurrentData; // kg water vapour per kg air
 
-        public double[,,] CloudIceXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QIIndex]).CurrentData; // kg ice water per kg air
-        public double[,,] CloudWaterXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QLIndex]).CurrentData; // kg liquid water per kg air
-        public double[,,] TemperatureXYP => ((MetData3D)MetFiles[I3Index].DataVariables[TIndex]).CurrentData;
+    public double[,,] CloudIceXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QIIndex]).CurrentData; // kg ice water per kg air
+    public double[,,] CloudWaterXYP => ((MetData3D)MetFiles[A3CldIndex].DataVariables[QLIndex]).CurrentData; // kg liquid water per kg air
+    public double[,,] TemperatureXYP => ((MetData3D)MetFiles[I3Index].DataVariables[TIndex]).CurrentData;
 
-        // Locations in arrays
-        protected int I3Index, A3DynIndex, A3CldIndex;
-        protected int PSIndex, TIndex, QVIndex, QIIndex, QLIndex;
-        protected int UIndex, VIndex, OmegaIndex;
+    // Locations in arrays
+    protected int I3Index, A3DynIndex, A3CldIndex;
+    protected int PSIndex, TIndex, QVIndex, QIIndex, QLIndex;
+    protected int UIndex, VIndex, OmegaIndex;
         
-        public MetManager(string metDir, double[] lonLims, double[] latLims, DateTime startDate)
-        {
+    public MetManager(string metDir, double[] lonLims, double[] latLims, DateTime startDate)
+    {
             MetFiles = [];
             
             // Read time offsets in seconds - A3 files are timestamped for
@@ -75,18 +75,17 @@
             QLIndex = currentFile.DataNames.FindIndex(element => element == "QL");
         }
         
-        public void AdvanceToTime(DateTime targetTime)
-        {
+    public void AdvanceToTime(DateTime targetTime)
+    {
             foreach (MetFile metFile in MetFiles)
             {
                 metFile.AdvanceToTime(targetTime);
             }
         }
 
-        public (double[], double[]) GetXYMesh()
-        {
+    public (double[], double[]) GetXYMesh()
+    {
             // Return the X and Y edge vectors from the first file in our possession
             return MetFiles[0].GetXYMesh();
         }
-    }
 }

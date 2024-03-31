@@ -25,7 +25,7 @@ public class PointManagerFlight : PointManager
 
     protected override LGPoint CreatePoint()
     {
-        return new LGPointConnected(VelocityCalc, IncludeCompression);
+        return new LGPointConnected(VelocityCalc);
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
@@ -37,6 +37,11 @@ public class PointManagerFlight : PointManager
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
         AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
             [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
+    }
+    
+    public override double GetPromotedProperty(LGPoint point, string property)
+    {
+        return ((LGPointConnected)point).GetProperty(property);
     }
 
     public void PrintFlights()

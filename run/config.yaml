@@ -9,7 +9,7 @@
    reporting: 180.0
    storage: 5.0
  points-dense:
-    max: 0
+    max: null
     initial: 1500
     # Calculate delta T due to pressure change?
     adiabatic-compression: true
@@ -28,9 +28,7 @@
     output-filename: flight-waypoints.nc
     # Not currently used
     segments-output-filename: flight-segments.nc
-    output-variables: ["temperature",
-                       "relative_humidity_ice",
-                       "segment_length",
+    output-variables: ["segment_length",
                        "segment_stretch",
                        "segment_tail_x",
                        "segment_tail_y",
