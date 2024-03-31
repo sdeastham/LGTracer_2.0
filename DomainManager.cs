@@ -495,7 +495,7 @@ namespace LGTracer
             return (vBoundary, faceAreas, boundaryIndices, levelIndices, nFaces);
         }
 
-        public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
+        public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
         {
             // TODO: Calculate weights by going vertically from BaseLevel into CeilingLevel
             // Use fractional overlap in pressure and then just calculate weights as before
@@ -576,7 +576,7 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[], double[], double) SeedPressureBoundaries(double kgPerPoint, double dt, System.Random RNG, double massSurplus = 0.0)
+        public (double[], double[], double[], double) SeedPressureBoundaries(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
         {
             // Seed the upper and lower domain boundaries proportional to vertical mass flow rate
             // Position along boundary for each cell is random
@@ -674,7 +674,7 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[], double[]) MapRandomToXYP( long nPoints, System.Random rng )
+        public (double[], double[], double[]) MapRandomToXYP( long nPoints, Random rng )
         {
             // Scatter randomly throughout domain
             double xSpan = XMax - XMin;

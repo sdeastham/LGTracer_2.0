@@ -9,7 +9,7 @@ namespace LGTracer
     {
         public LinkedList<LGPoint> ActivePoints { get; private set; }
 
-        private LinkedList<LGPoint> InactivePoints { get; set; }
+        protected LinkedList<LGPoint> InactivePoints { get; set; }
 
         private uint nextUID { get; set; }
 
@@ -57,7 +57,7 @@ namespace LGTracer
         private bool Debug;
 
         // Do we calculate the effect of compression on temperature?
-        private bool IncludeCompression;
+        protected bool IncludeCompression;
 
         public string OutputFilename
         { get; private set; }
@@ -128,11 +128,17 @@ namespace LGTracer
         // Must be overridden!
         public abstract void Seed(double dt);
 
+        // Use this to abstract the underlying type of the points and allow inheriting classes to change them
+        protected virtual LGPoint CreatePoint()
+        {
+            return new LGPoint(VelocityCalc,IncludeCompression);
+        }
+        
         private LGPoint AddPoint( double x, double y, double pressure )
         {
             // Create a new point in the list
             // Start by creating an _inactive_ point
-            LGPoint point = new LGPoint(VelocityCalc,IncludeCompression);
+            LGPoint point = CreatePoint();
             InactivePoints.AddLast(point);
             NInactive++;
             // Activate a point (doesn't matter if it's the same one) and return it

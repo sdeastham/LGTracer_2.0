@@ -66,36 +66,36 @@ namespace LGTracer
         public LGPoint( Func<double, double, double, (double, double, double)> vCalc, bool includeCompression = false )
         {
             // Point starts inactive
-            this._location = new Vector3(float.NaN,float.NaN,float.NaN);
-            this.InitialLocation = new Vector3(float.NaN,float.NaN,float.NaN);
-            this.VelocityCalc = vCalc;
+            _location = new Vector3(float.NaN,float.NaN,float.NaN);
+            InitialLocation = new Vector3(float.NaN,float.NaN,float.NaN);
+            VelocityCalc = vCalc;
             // Set the rest of the properties by deactivating the point
-            this.Deactivate();
+            Deactivate();
             // Do we want to calculate the effect of adiabatic compression on temperature?
-            this.IncludeCompression = includeCompression;
+            IncludeCompression = includeCompression;
         }
 
         public virtual void Activate( double x, double y, double pressure, uint uniqueID )
         {
             // Change the particle from being inactive to active
-            this.Active = true;
-            this._location = new Vector3((float)x, (float)y, (float)pressure);
+            Active = true;
+            _location = new Vector3((float)x, (float)y, (float)pressure);
             // Copy this data for later comparison
-            this.InitialLocation = new Vector3((float)x, (float)y, (float)pressure);
-            this.UID = uniqueID;
-            this.Age = 0.0;
+            InitialLocation = new Vector3((float)x, (float)y, (float)pressure);
+            UID = uniqueID;
+            Age = 0.0;
         }
 
         public virtual void Deactivate()
         {
             // Kill the particle and put it into storage
-            this.Active = false;
-            this._location = new Vector3(float.NaN,float.NaN,float.NaN);
-            this.UID = 0;
+            Active = false;
+            _location = new Vector3(float.NaN,float.NaN,float.NaN);
+            UID = 0;
             // Properties
-            this.Temperature = double.NaN;
-            this.SpecificHumidity = double.NaN;
-            this.Age = double.NaN;
+            Temperature = double.NaN;
+            SpecificHumidity = double.NaN;
+            Age = double.NaN;
         }
 
         public virtual double GetProperty(string property)
@@ -121,12 +121,12 @@ namespace LGTracer
 
         public void SetTemperature( double value )
         {
-            this.Temperature = value;
+            Temperature = value;
         }
 
         public void SetSpecificHumidity( double value )
         {
-            this.SpecificHumidity = value;
+            SpecificHumidity = value;
         }
 
         public virtual void Advance( double dt )

@@ -9,11 +9,23 @@ public class LGSegment
     public LGPointConnected Head { get; protected set; }
     public LGPointConnected Tail { get; protected set; }
     public double InitialSegmentLength { get; protected set; }
-    public double SegmentLength { get; protected set; }
     private bool HeadUpdated;
     private bool TailUpdated;
+    private string Source;
+    private uint UniqueID;
     
     // Avoid unnecessary recalculations
+    private double _SegmentLength;
+
+    public double SegmentLength
+    {
+        get
+        {
+            UpdateProperties();
+            return _SegmentLength;
+        }
+    }
+    
     private double _XMidpoint;
     public double XMidpoint
     {
@@ -35,7 +47,7 @@ public class LGSegment
     }
     protected bool Stale { get; private set; }
     
-    public LGSegment(LGPointConnected head, LGPointConnected tail)
+    public LGSegment(LGPointConnected head, LGPointConnected tail, uint uniqueId, string source="UNKNOWN")
     {
         Head = head;
         Tail = tail;
@@ -44,6 +56,8 @@ public class LGSegment
         HeadUpdated = false;
         TailUpdated = false;
         Stale = false;
+        UniqueID = uniqueId;
+        Source = source;
     }
 
     public void Advance(LGPointConnected source)
@@ -81,7 +95,7 @@ public class LGSegment
 
     private void CalculateSegmentLength()
     {
-        SegmentLength = Geodesy.GreatCircleDistance(Head.X, Head.Y, Tail.X, Tail.Y);
+        _SegmentLength = Geodesy.GreatCircleDistance(Head.X, Head.Y, Tail.X, Tail.Y);
     }
 
     private void CalculateSegmentMidpoint()
@@ -91,5 +105,36 @@ public class LGSegment
             Head.X, Head.Y, 3);
         _XMidpoint = lons[1];
         _YMidpoint = lats[1];
+    }
+
+    public double GetProperty(string property)
+    {
+        switch (property.ToLower().Replace("_",""))
+        {
+            case "stretch":
+                return SegmentLength / InitialSegmentLength;
+            case "length":
+                return SegmentLength;
+            case "tailx":
+            case "taillon":
+                return Tail.X;
+            case "taily":
+            case "taillat":
+                return Tail.Y;
+            case "tailp":
+            case "tailpressure":
+                return Tail.Pressure;
+            case "headx":
+            case "headlon":
+                return Head.X;
+            case "heady":
+            case "headlat":
+                return Head.Y;
+            case "headp":
+            case "headpressure":
+                return Head.Pressure;
+            default:
+                throw new ArgumentException($"No property for LGSegment called {property}");
+        }
     }
 }

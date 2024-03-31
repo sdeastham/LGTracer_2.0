@@ -60,10 +60,10 @@ namespace LGTracer
 
             // Which point properties will we output?
             string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
-            string[] flightPropertyNames = ["temperature", "relative_humidity_ice"];
+            string[] flightsPropertyNames = ["temperature", "relative_humidity_ice","segment_length","segment_stretch","segment_tail_x","segment_tail_y","segment_tail_p"];
             
             // Use a master RNG to generate seeds predictably
-            System.Random masterRNG;
+            Random masterRNG;
             if (configOptions.Seed != null)
             {
                 // Use this if debugging
@@ -83,7 +83,7 @@ namespace LGTracer
             // a large number (>>>10) of dense point managers, which is not expected to be the case
             if (configOptions.PointsDense.Active)
             {
-                System.Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
+                Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
 
                 double kgPerPoint = configOptions.PointsDense.KgPerPoint;
 
@@ -118,7 +118,7 @@ namespace LGTracer
                 PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
                     outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
                     includeCompression: configOptions.PointsFlights.AdiabaticCompression,
-                    propertyNames: densePropertyNames);
+                    propertyNames: flightsPropertyNames);
 
                 if (configOptions.PointsFlights.ScheduleFilename != null)
                 {
@@ -135,20 +135,6 @@ namespace LGTracer
                 {
                     pointManager.ReadSegmentsFile(configOptions.PointsFlights.SegmentsFilename);
                 }
-
-                // Add some flights [TESTING]
-                /*
-                double machOneKPH = (3600.0 / 1000.0) * Math.Sqrt(1.4 * Physics.RGasUniversal * 200.0 / 28.97e-3);
-                double lonBOS = -1.0 * (71.0 + 0.0 / 60.0 + 23.0 / 3600.0);
-                double latBOS = 42.0 + 21.0 / 60.0 + 47.0 / 3600.0;
-                double lonLHR = -1.0 * (0.0 + 27.0 / 60.0 + 41.0 / 3600.0);
-                double latLHR = 51.0 + 28.0 / 60.0 + 39.0 / 3600.0;
-                double cruiseSpeedKPH = machOneKPH * 0.8;
-                pointManager.SimulateFlight(lonBOS, latBOS, lonLHR, latLHR, startDate,
-                    cruiseSpeedKPH, flightLabel: $"BOS_LHR_{startDate}_{endDate}", pointPeriod: pointPeriod);
-                pointManager.SimulateFlight(lonLHR, latLHR, lonBOS, latBOS, startDate,
-                    cruiseSpeedKPH, flightLabel: $"LHR_BOS_{startDate}_{endDate}", pointPeriod: pointPeriod);
-                */
                 
                 // Store initial conditions
                 pointManager.ArchiveConditions(tCurr);
@@ -243,11 +229,11 @@ namespace LGTracer
             return deserializer.Deserialize<LGOptions>(yaml);
         }
         
-        private static System.Random GetNextRNG(System.Random masterRNG, List<int> seedsUsed)
+        private static Random GetNextRNG(Random masterRNG, List<int> seedsUsed)
         {
             int seed;
             do { seed = masterRNG.Next(); } while (seedsUsed.Contains(seed));
-            System.Random pmRNG = new SystemRandomSource(seed);
+            Random pmRNG = new SystemRandomSource(seed);
             seedsUsed.Add(seed);
             return pmRNG;
         }

@@ -18,15 +18,15 @@ public class LGPointConnected(
     private LGPointConnected? Next;
     private LGSegment? Segment;
 
-    public void Activate(double x, double y, double pressure, uint uniqueID, LGPointConnected? predecessor)
+    public void Connect(LGPointConnected? predecessor, uint? segmentID=null, string segmentSource="UNKNOWN")
     {
         Previous = predecessor;
         if (Previous != null)
         {
             Previous.Next = this;
         }
-        CreateSegment();
-        base.Activate(x, y, pressure, uniqueID);
+        // Use the point ID if no segment ID is given
+        CreateSegment(segmentID ?? this.UID, segmentSource);
     }
 
     public override void Deactivate()
@@ -49,12 +49,12 @@ public class LGPointConnected(
         base.Deactivate();
     }
 
-    public void CreateSegment()
+    public void CreateSegment(uint uniqueID, string source)
     {
         if (Previous == null) { return; }
         Debug.Assert(Segment != null,"Segment already exists");
         // Create segment and associate it to this class
-        Segment = new LGSegment(this,Previous);
+        Segment = new LGSegment(this,Previous,uniqueID,source);
     }
 
     public void DestroySegment()
@@ -72,5 +72,18 @@ public class LGPointConnected(
         Segment?.Advance(this);
         // If we are tail of a segment, also update that
         Next?.Segment?.Advance(this);
+    }
+
+    public override double GetProperty(string property)
+    {
+        if (!property.StartsWith("segment", StringComparison.CurrentCultureIgnoreCase))
+        {
+            return base.GetProperty(property);
+        }
+        if (Segment == null)
+        {
+            return double.NaN;
+        }
+        return Segment.GetProperty(property.Substring(7));
     }
 }

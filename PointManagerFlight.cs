@@ -9,7 +9,7 @@ public class PointManagerFlight : PointManager
 {
     protected LinkedList<FlightSegment> FlightSegments;
     protected DateTime LastSeedTime;
-    protected Dictionary<string,LinkedList<FlightSegment>> FlightTable;
+    protected Dictionary<string, Flight> FlightTable;
     protected double PointPeriod;
     public string SegmentsOutputFilename { get; protected set; }
 
@@ -25,6 +25,11 @@ public class PointManagerFlight : PointManager
         SegmentsOutputFilename = segmentsOutputFilename;
     }
 
+    protected override LGPoint CreatePoint()
+    {
+        return new LGPointConnected(VelocityCalc, IncludeCompression);
+    }
+
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
         DateTime takeoffTime, double cruiseSpeedKPH, string? flightLabel = null, double pointPeriod = 60.0 * 5.0)
     {
@@ -32,8 +37,8 @@ public class PointManagerFlight : PointManager
         double cruiseAltitude = 10.0; // km
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
-        AddFlight([originLon,destinationLon],[originLat,destinationLat],[cruiseAltitude,cruiseAltitude],
-            [takeoffTime,endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
+        AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
+            [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
     }
 
     public void PrintFlights()
@@ -43,13 +48,14 @@ public class PointManagerFlight : PointManager
             Console.WriteLine($"Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
             foreach (FlightSegment.Waypoint waypoint in segment.Waypoints)
             {
-                Console.WriteLine($" --> Waypoint: {waypoint.Lat,9:f2}N/{waypoint.Lon,9:f2} to deploy at {waypoint.DeploymentTime}");
+                Console.WriteLine(
+                    $" --> Waypoint: {waypoint.Lat,9:f2}N/{waypoint.Lon,9:f2} to deploy at {waypoint.DeploymentTime}");
             }
         }
     }
 
     public void AddFlight(double[] lons, double[] lats, double[] pressureAltitudes, DateTime[] dateTimes,
-        string? flightLabel=null, double pointPeriod = 60.0 * 5.0)
+        string? flightLabel = null, double pointPeriod = 60.0 * 5.0)
     {
         /* Add a flight as a series of waypoints
          Vector inputs (one value per waypoint):
@@ -60,13 +66,13 @@ public class PointManagerFlight : PointManager
           Scalar inputs (optional)
           - flightLabel         A unique string to identify the flight*
           - pointPeriod         Seconds between seeds to be dropped along the track
-          
+
           If a flight label is not given then on is generated based on the origin location, end location, start time,
           and end time. This should be reasonably reliable as there should be essentially no times that two aircraft
           start from the same point go to the same point at exactly the same times.
-          
-          A word of caution - this function does NOT simulate cruise or similar, so if you want to simulate flight 
-          between two airports either do the simulation properly or give the pressures as being at cruise already. 
+
+          A word of caution - this function does NOT simulate cruise or similar, so if you want to simulate flight
+          between two airports either do the simulation properly or give the pressures as being at cruise already.
         */
         int nSegments = lons.Length - 1;
         string flightLabelSafe;
@@ -78,6 +84,7 @@ public class PointManagerFlight : PointManager
         {
             flightLabelSafe = flightLabel;
         }
+
         for (int i = 0; i < nSegments; i++)
         {
             double gcd = Geodesy.GreatCircleDistance(lons[i], lats[i], lons[i + 1], lats[i + 1]);
@@ -102,6 +109,7 @@ public class PointManagerFlight : PointManager
         {
             return;
         }
+
         if ((node != null) && (node.Value.FlightID == flightLabel))
         {
             FlightSegments.Last!.Value.PreviousSegment = node.Value;
@@ -129,9 +137,10 @@ public class PointManagerFlight : PointManager
         // Add to the table of flights
         if (!FlightTable.ContainsKey(flightLabel))
         {
-            FlightTable.Add(flightLabel, []);
+            FlightTable.Add(flightLabel, new Flight());
         }
-        FlightTable[flightLabel].AddLast(seg);
+
+        FlightTable[flightLabel].SegmentList.AddLast(seg);
     }
 
     public override void Seed(double dt)
@@ -144,6 +153,7 @@ public class PointManagerFlight : PointManager
             foreach (FlightSegment.Waypoint seed in seedVector)
             {
                 LGPoint newPoint = NextPoint(seed.Lon, seed.Lat, seed.Pressure);
+                LGPointConnected newPointConnected = (LGPointConnected)newPoint;
                 // TODO: Put all of this in the override for NextPoint
                 // TODO: Determine if the new point's predecessor from the same flight exists
                 // TODO: Write a plume segment class which represents a segment length
@@ -153,6 +163,7 @@ public class PointManagerFlight : PointManager
                 // TODO: Allow the point to carry/retrieve segment properties (nested class?)
             }
         }
+
         LastSeedTime = endTime;
     }
 
@@ -170,6 +181,7 @@ public class PointManagerFlight : PointManager
             {
                 FlightSegments.Remove(node);
             }
+
             node = nextNode;
         }
         // TODO: Go through subsegments and see if any have lost their head or tail
@@ -179,6 +191,7 @@ public class PointManagerFlight : PointManager
     {
         throw new NotImplementedException("Segment file reading not yet implemented");
     }
+
     public void ReadScheduleFile(string scheduleFilePath, string airportFilePath)
     {
         // First read in the airport data file
@@ -189,9 +202,9 @@ public class PointManagerFlight : PointManager
             csvParser.CommentTokens = ["#"];
             csvParser.SetDelimiters([","]);
             csvParser.HasFieldsEnclosedInQuotes = true;
-            
+
             // Get the columns
-            string [] colNames = csvParser.ReadFields();
+            string[] colNames = csvParser.ReadFields();
             int icaoIndex = Array.IndexOf(colNames, "ICAO name");
             int iataIndex = Array.IndexOf(colNames, "IATA name");
             int latIndex = Array.IndexOf(colNames, "Latitude");
@@ -201,20 +214,20 @@ public class PointManagerFlight : PointManager
             {
                 string[] fields = csvParser.ReadFields();
                 string airportName = fields[iataIndex]; // Use IATA for now
-                airports.Add(airportName,new Airport(double.Parse(fields[lonIndex]),
-                    double.Parse(fields[latIndex]), fields[iataIndex],fields[icaoIndex]));
+                airports.Add(airportName, new Airport(double.Parse(fields[lonIndex]),
+                    double.Parse(fields[latIndex]), fields[iataIndex], fields[icaoIndex]));
             }
         }
-        
+
         // Now the schedule file
         using (TextFieldParser csvParser = new TextFieldParser(scheduleFilePath))
         {
             csvParser.CommentTokens = ["#"];
             csvParser.SetDelimiters([","]);
             csvParser.HasFieldsEnclosedInQuotes = true;
-            
+
             // Get the columns
-            string [] colNames = csvParser.ReadFields();
+            string[] colNames = csvParser.ReadFields();
             int originIndex = Array.IndexOf(colNames, "Origin airport");
             int destinationIndex = Array.IndexOf(colNames, "Destination airport");
             int dateIndex = Array.IndexOf(colNames, "Takeoff date");
@@ -230,14 +243,18 @@ public class PointManagerFlight : PointManager
                 string destination = fields[destinationIndex];
                 Airport originAirport = airports[origin];
                 Airport destinationAirport = airports[destination];
-                if (originAirport == destinationAirport) { continue; }
+                if (originAirport == destinationAirport)
+                {
+                    continue;
+                }
+
                 // Build a full date/time string
                 string dtFull = $"{fields[dateIndex]} {fields[timeIndex]}Z";
                 DateTime takeoff = DateTime.ParseExact(dtFull, "u", cultureInfo);
                 // Add flight
-                SimulateFlight(originAirport.Longitude,originAirport.Latitude,
-                    destinationAirport.Longitude,destinationAirport.Latitude,
-                    takeoff,820.0,null,PointPeriod);
+                SimulateFlight(originAirport.Longitude, originAirport.Latitude,
+                    destinationAirport.Longitude, destinationAirport.Latitude,
+                    takeoff, 820.0, null, PointPeriod);
             }
         }
     }
@@ -258,6 +275,11 @@ public class PointManagerFlight : PointManager
         public string NameICAO = nameICAO;
         public double Elevation = elevation;
     }
+    protected class Flight
+    {
+        public LinkedList<FlightSegment> SegmentList = [];
+        protected LGPointConnected? LastPoint = null;
+    }
 }
 
 public class FlightSegment
@@ -266,6 +288,7 @@ public class FlightSegment
     public double[] EndLatLon { get; protected set; }
     public DateTime StartDateTime { get; protected set; }
     public DateTime EndDateTime { get; protected set; }
+    public LGPointConnected? LastPoint { get; protected set; }
 
     // Altitudes are "pressure altitudes", meaning they are the pressure the ISA says corresponds to a given altitude
     private double StartAltitudePa; 
@@ -274,7 +297,7 @@ public class FlightSegment
     public int WaypointsRemaining => Waypoints.Count;
     public FlightSegment? PreviousSegment;
     public string FlightID { get; private set; }
-
+    
     public FlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
         double cruisePressureAltitude, double flightSpeed, double pointPeriod,
@@ -359,7 +382,6 @@ public class FlightSegment
                 seedList.Add(node.Value);
                 Waypoints.Remove(node);
             }
-
             node = nextNode;
         }
         return seedList.ToArray();
