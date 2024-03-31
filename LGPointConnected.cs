@@ -15,7 +15,7 @@ public class LGPointConnected(
     */
     private LGPointConnected? Previous;
     private LGPointConnected? Next;
-    private LGSegment? Segment;
+    protected LGSegment? Segment;
 
     public void Connect(LGPointConnected? predecessor, uint? segmentID=null, string segmentSource="UNKNOWN")
     {
