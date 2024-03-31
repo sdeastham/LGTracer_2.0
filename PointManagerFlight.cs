@@ -14,8 +14,8 @@ public class PointManagerFlight : PointManager
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
-        bool debug = false, bool includeCompression = false, string[]? propertyNames = null,
-        double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, debug, includeCompression, propertyNames)
+        bool verboseOutput = false, bool includeCompression = false, string[]? propertyNames = null,
+        double kgPerPoint = 1.0e12) : base(maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
     {
         LastSeedTime = initialSeedTime;
         FlightTable = [];

@@ -54,7 +54,7 @@ public abstract class PointManager
     public long MaxStoredPoints
     { get; private set; }
 
-    private bool Debug;
+    private bool VerboseOutput;
 
     // Do we calculate the effect of compression on temperature?
     protected bool IncludeCompression;
@@ -62,7 +62,7 @@ public abstract class PointManager
     public string OutputFilename
     { get; private set; }
 
-    public PointManager( long? maxPoints, DomainManager domain, string filename, bool debug=false, bool includeCompression=false, string[]? propertyNames=null )
+    public PointManager( long? maxPoints, DomainManager domain, string filename, bool verboseOutput=false, bool includeCompression=false, string[]? propertyNames=null )
     {
         // UIDs start from 1 (0 reserved for inactive points)
         nextUID = 1;
@@ -118,7 +118,7 @@ public abstract class PointManager
         Domain = domain;
 
         // Run in debug mode?
-        Debug = debug;
+        VerboseOutput = verboseOutput;
         return;
 
         // Set the velocity calculation
