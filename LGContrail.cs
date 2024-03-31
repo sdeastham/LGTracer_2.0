@@ -37,7 +37,7 @@ public class LGContrail : LGPointConnected
         // Update temperature based on adiabatic compression
         if (IncludeCompression)
         {
-            Temperature = Temperature * Math.Pow(Pressure/oldPressure,GammaRatio);
+            Temperature *= Math.Pow(Pressure/oldPressure,GammaRatio);
         }
     }
 
