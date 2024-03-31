@@ -109,21 +109,11 @@ public class PointManagerFlight : PointManager
         LinkedListNode<FlightSegment>? node = flight.SegmentList.Last;
         AddFlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
             endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel);
-        if (flight.SegmentList.Last == null)
-        {
-            return;
-        }
-
-        if ((node != null) && (node.Value.FlightID == flightLabel))
-        {
-            flight.SegmentList.Last!.Value.PreviousSegment = node.Value;
-        }
     }
 
     public void AddFlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
-        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
-        FlightSegment? previousSegment = null)
+        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel)
     {
         // Define a new flight segment, to take place at constant cruise pressure altitude and flight speed
         // Units:
@@ -134,7 +124,7 @@ public class PointManagerFlight : PointManager
         // * pointPeriod                Seconds between production of a new point
         // The first point will be produced in the first timestep which contains the start time
         FlightSegment seg = new FlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
-            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, previousSegment);
+            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel);
         // Remove any waypoints which would already have been deployed
         seg.CullByDatetime(LastSeedTime);
         // Add to the table of flights
@@ -303,20 +293,18 @@ public class FlightSegment
     public double[] EndLatLon { get; protected set; }
     public DateTime StartDateTime { get; protected set; }
     public DateTime EndDateTime { get; protected set; }
-    public LGPointConnected? LastPoint { get; protected set; }
 
     // Altitudes are "pressure altitudes", meaning they are the pressure the ISA says corresponds to a given altitude
     private double StartAltitudePa; 
     private double EndAltitudePa;
     public LinkedList<Waypoint> Waypoints { get; protected set; }
     public int WaypointsRemaining => Waypoints.Count;
-    public FlightSegment? PreviousSegment;
     public string FlightID { get; private set; }
     
     public FlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
         double cruisePressureAltitude, double flightSpeed, double pointPeriod,
-        string flightLabel = "UNKNOWN",FlightSegment? previousSegment = null)
+        string flightLabel = "UNKNOWN")
     {
         StartDateTime = startDateTime;
         EndDateTime = endDateTime;
@@ -326,7 +314,6 @@ public class FlightSegment
         double cruisePressurePa = ISAtmos.AltitudeToPressure(cruisePressureAltitude);
         StartAltitudePa = cruisePressurePa;
         EndAltitudePa = cruisePressurePa;
-        PreviousSegment = previousSegment;
         // A (hopefully!) unique identifier
         FlightID = flightLabel;
 
@@ -338,7 +325,7 @@ public class FlightSegment
         
         // Calculate how many points we will need to seed, when they should be seeded, and where
         // Get the locations of the seeds
-        (double[] waypointLons, double[] waypointLats, double[] initialSubsegmentLengths) = 
+        (double[] waypointLons, double[] waypointLats, _) = 
             Geodesy.GreatCircleWaypointsByLength(startLongitude, startLatitude, endLongitude, endLatitude, waypointSpacing);
         int nWaypoints = waypointLons.Length;
         // Something to track which seeds have been dropped
@@ -354,15 +341,8 @@ public class FlightSegment
         Waypoints = [];
         for (int iWaypoint = 0; iWaypoint < nWaypoints; iWaypoint++)
         {
-            double segmentDistance = 0.0;
-            if (iWaypoint < (nWaypoints - 1))
-            {
-                segmentDistance = initialSubsegmentLengths[iWaypoint];
-            }
-            // The leader flag is used to help determine whether the predecessor waypoint is from this flight segment
-            // or from a previous flight segment
             Waypoints.AddLast(new Waypoint(waypointLons[iWaypoint], waypointLats[iWaypoint], cruisePressurePa,
-                waypointTimes[iWaypoint], segmentDistance, iWaypoint == 0));
+                waypointTimes[iWaypoint]));
         }
     }
 
@@ -403,13 +383,11 @@ public class FlightSegment
     }
 
     // Nested class because no-one else needs this
-    public class Waypoint(double lon, double lat, double pressure, DateTime deploymentTime, double segmentDistance = 0.0, bool leader = false)
+    public class Waypoint(double lon, double lat, double pressure, DateTime deploymentTime)
     {
         public double Lon = lon;
         public double Lat = lat;
         public double Pressure = pressure;
-        public double SegmentDistance = segmentDistance;
-        public bool Leader = leader;
         public DateTime DeploymentTime = deploymentTime;
 
         public bool Deploy(DateTime now)
