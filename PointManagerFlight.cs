@@ -39,7 +39,7 @@ public class PointManagerFlight : PointManager
             [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
     }
     
-    public override double GetPromotedProperty(LGPoint point, string property)
+    public override double GetPromotedProperty(IAdvected point, string property)
     {
         return ((LGPointConnected)point).GetProperty(property);
     }

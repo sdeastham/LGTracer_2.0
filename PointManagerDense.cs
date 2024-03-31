@@ -17,7 +17,7 @@ public class PointManagerDense : PointManager
         Rng = rng;
     }
         
-    protected override LGPoint CreatePoint()
+    protected override IAdvected CreatePoint()
     {
         return new LGAirMass(VelocityCalc,IncludeCompression);
     }
@@ -44,7 +44,7 @@ public class PointManagerDense : PointManager
         return point;
     }
         
-    public override double GetPromotedProperty(LGPoint point, string property)
+    public override double GetPromotedProperty(IAdvected point, string property)
     {
         return ((LGAirMass)point).GetProperty(property);
     }

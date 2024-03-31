@@ -1,8 +1,9 @@
 using System.Numerics;
+using System.Runtime.Intrinsics.X86;
 
 namespace LGTracer;
 
-public class LGPoint
+public class LGPoint : IAdvected
 {
     protected Vector3 _location
     { get; set; }
@@ -22,6 +23,11 @@ public class LGPoint
     public double Age
     { get; protected set; }
 
+    public double GetAge()
+    {
+        return Age;
+    }
+
     // Convenience properties
     public double X
     { 
@@ -38,6 +44,16 @@ public class LGPoint
     { 
         get => _location.Z;
         set => _location = new Vector3(_location.X,_location.Y,(float)value);
+    }
+    
+    public (double, double, double) GetLocation()
+    {
+        return( X, Y, Pressure );
+    }
+
+    public uint GetUID()
+    {
+        return UID;
     }
 
     public LGPoint( Func<double, double, double, (double, double, double)> vCalc)

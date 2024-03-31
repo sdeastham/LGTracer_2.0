@@ -7,9 +7,9 @@ namespace LGTracer;
 
 public abstract class PointManager
 {
-    public LinkedList<LGPoint> ActivePoints { get; private set; }
+    public LinkedList<IAdvected> ActivePoints { get; private set; }
 
-    protected LinkedList<LGPoint> InactivePoints { get; set; }
+    protected LinkedList<IAdvected> InactivePoints { get; set; }
 
     private uint nextUID { get; set; }
 
@@ -129,28 +129,28 @@ public abstract class PointManager
     public abstract void Seed(double dt);
 
     // Use this to abstract the underlying type of the points and allow inheriting classes to change them
-    protected virtual LGPoint CreatePoint()
+    protected virtual IAdvected CreatePoint()
     {
         return new LGPoint(VelocityCalc);
     }
         
-    private LGPoint AddPoint( double x, double y, double pressure )
+    private IAdvected AddPoint( double x, double y, double pressure )
     {
         // Create a new point in the list
         // Start by creating an _inactive_ point
-        LGPoint point = CreatePoint();
+        IAdvected point = CreatePoint();
         InactivePoints.AddLast(point);
         NInactive++;
         // Activate a point (doesn't matter if it's the same one) and return it
         return ActivatePoint(x,y,pressure);
     }
 
-    private LGPoint ActivatePoint( double x, double y, double pressure )
+    private IAdvected ActivatePoint( double x, double y, double pressure )
     {
         // Reactivate the first available dormant point and assign it a new UID
         System.Diagnostics.Debug.Assert(InactivePoints.First != null, "InactivePoints.First != null");
-        LinkedListNode<LGPoint> node = InactivePoints.First;
-        LGPoint point = node.Value;
+        LinkedListNode<IAdvected> node = InactivePoints.First;
+        IAdvected point = node.Value;
         InactivePoints.Remove(node);
         ActivePoints.AddLast(node);
 
@@ -162,13 +162,13 @@ public abstract class PointManager
         return point;
     }
 
-    public virtual LGPoint NextPoint( double x, double y, double pressure )
+    public virtual IAdvected NextPoint( double x, double y, double pressure )
     {
         // Function places a new point, taken from the inactive list if any available.
         // If no points are available, add one if possible; otherwise throw an exception
 
         // Are there any inactive points available?
-        LGPoint point;
+        IAdvected point;
         if (NInactive > 0)
         {
             // Reactivate a dormant point
@@ -188,10 +188,10 @@ public abstract class PointManager
         return point;
     }
 
-    public void DeactivatePoint( LinkedListNode<LGPoint> node )
+    public void DeactivatePoint( LinkedListNode<IAdvected> node )
     {
         // Deactivate point i of those present in ActivePoints
-        LGPoint point = node.Value;
+        IAdvected point = node.Value;
         point.Deactivate();
         ActivePoints.Remove(node);
         InactivePoints.AddLast(node);
@@ -211,7 +211,7 @@ public abstract class PointManager
     public void Advance( double dt )
     {
         // Advances all active points one time step
-        foreach (LGPoint point in ActivePoints)
+        foreach (IAdvected point in ActivePoints)
         {
             point.Advance(dt);
         }
@@ -220,13 +220,14 @@ public abstract class PointManager
     public virtual void Cull()
     {
         // Deactivate any points which are outside the domain
-        LinkedListNode<LGPoint>? node = ActivePoints.First;
+        LinkedListNode<IAdvected>? node = ActivePoints.First;
         // The structure below is necessary because we can't get the next node from a deactivated node
         while (node != null)
         {
-            LinkedListNode<LGPoint>? nextNode = node.Next;
-            LGPoint point = node.Value;
-            if (point.X < Domain.XMin || point.X >= Domain.XMax || point.Y < Domain.YMin || point.Y >= Domain.YMax || point.Pressure > Domain.PBase || point.Pressure < Domain.PCeiling )
+            LinkedListNode<IAdvected>? nextNode = node.Next;
+            IAdvected point = node.Value;
+            (double x, double y, double p) = point.GetLocation();
+            if (x < Domain.XMin || x >= Domain.XMax || y < Domain.YMin || y >= Domain.YMax || p > Domain.PBase || p < Domain.PCeiling )
             {
                 DeactivatePoint(node);
             }
@@ -347,13 +348,11 @@ public abstract class PointManager
             properties.Add(vec);
         }
         long i=0;
-        foreach (LGPoint point in ActivePoints)
+        foreach (IAdvected point in ActivePoints)
         {
-            ages[i] = point.Age;
-            xPoints[i] = point.X;
-            yPoints[i] = point.Y;
-            pressurePoints[i] = point.Pressure;
-            UIDs[i] = point.UID;
+            ages[i] = point.GetAge();
+            (xPoints[i], yPoints[i], pressurePoints[i]) = point.GetLocation();
+            UIDs[i] = point.GetUID();
             // Get any remaining properties from the point
             // Need to allow for different point classes
             // It would be better here to register the get methods at manager initialization, but
@@ -376,7 +375,7 @@ public abstract class PointManager
         }
     }
 
-    public virtual double GetPromotedProperty(LGPoint point, string property)
+    public virtual double GetPromotedProperty(IAdvected point, string property)
     {
         return point.GetProperty(property);
     }
