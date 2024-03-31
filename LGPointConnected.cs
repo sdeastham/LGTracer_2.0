@@ -3,9 +3,8 @@
 namespace LGTracer;
 
 public class LGPointConnected(
-    Func<double, double, double, (double, double, double)> vCalc,
-    bool includeCompression = false)
-    : LGPoint(vCalc, includeCompression)
+    Func<double, double, double, (double, double, double)> vCalc)
+    : LGPoint(vCalc)
 {
     /*
      LGPointConnected objects are intended to represent vertices along a chain of points, e.g. representing a

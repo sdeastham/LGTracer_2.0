@@ -4,31 +4,31 @@ using Microsoft.Research.Science.Data.NetCDF4;
 
 using System.Diagnostics.CodeAnalysis;
 
-namespace LGTracer
+namespace LGTracer;
+
+public class MetFile
 {
-    public class MetFile
-    {
-        // The MetFile class holds all MetData variables
-        // read from a single file. It is responsible for
-        // keeping track of the dataset handle and updating
-        // the variables as time proceeds
-        private DataSet DS;
-        private NetCDFUri DSUri;
-        private DateTime[] TimeVec;
-        private string FileTemplate;
-        private int SecondOffset; // Number of seconds to offset times which are read in
-        public List<IMetData> DataVariables { get; private set; }
-        public List<string> DataNames { get; private set; }
-        private int[] XBounds, YBounds;
-        private double[] XEdge, YEdge;
-        private double[] XLim, YLim;
-        private int NLevels;
-        private int TimeIndex;
-        private TimeSpan TimeDelta;
+    // The MetFile class holds all MetData variables
+    // read from a single file. It is responsible for
+    // keeping track of the dataset handle and updating
+    // the variables as time proceeds
+    private DataSet DS;
+    private NetCDFUri DSUri;
+    private DateTime[] TimeVec;
+    private string FileTemplate;
+    private int SecondOffset; // Number of seconds to offset times which are read in
+    public List<IMetData> DataVariables { get; private set; }
+    public List<string> DataNames { get; private set; }
+    private int[] XBounds, YBounds;
+    private double[] XEdge, YEdge;
+    private double[] XLim, YLim;
+    private int NLevels;
+    private int TimeIndex;
+    private TimeSpan TimeDelta;
 
     public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D,
-                   double[] xLim, double[] yLim, int secondOffset=0, bool timeInterp=true)
-        {
+        double[] xLim, double[] yLim, int secondOffset=0, bool timeInterp=true)
+    {
             FileTemplate = fileTemplate;
             SecondOffset = secondOffset;
             // Set domain boundaries
@@ -87,8 +87,8 @@ namespace LGTracer
             AdvanceToTime(firstTime, forceUpdate: true);
         }
     
-        public void AdvanceToTime(DateTime newTime, bool forceUpdate = false)
-        {
+    public void AdvanceToTime(DateTime newTime, bool forceUpdate = false)
+    {
             // Scan through the current times
             // Track whether we need to update - this is important because in theory
             // we could end up with the same time index
@@ -97,8 +97,7 @@ namespace LGTracer
             {
                 updateFiles = true;
                 TimeIndex++;
-                // If the time index now points to the final time in 
-                // the vector, then we need to update the underlying
+                // If the time index now points to the final time in      // the vector, then we need to update the underlying
                 // date structure
                 if (TimeIndex >= (TimeVec.Length - 1))
                 {
@@ -126,19 +125,19 @@ namespace LGTracer
             }
         }
 
-        private double IntervalFraction(DateTime targetTime)
-        {
+    private double IntervalFraction(DateTime targetTime)
+    {
             // How far through the current time interval is the proposed time?
             return (targetTime - TimeVec[TimeIndex]).TotalSeconds / TimeDelta.TotalSeconds;
         }
-        private string FillTemplate(DateTime targetTime)
-        {
+    private string FillTemplate(DateTime targetTime)
+    {
             return string.Format(FileTemplate,targetTime.Year,targetTime.Month,targetTime.Day);
         }
 
-        [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds),nameof(XEdge),nameof(YEdge))]
-        private void ReadFile(DateTime targetTime, bool firstRead)
-        {
+    [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds),nameof(XEdge),nameof(YEdge))]
+    private void ReadFile(DateTime targetTime, bool firstRead)
+    {
             string fileName = FillTemplate(targetTime);
             DSUri = new NetCDFUri
             {
@@ -169,8 +168,8 @@ namespace LGTracer
             }
         }
 
-        private static DateTime[] ParseFileTimes(string units, int[] timeDeltas, int secondOffset=0)
-        {
+    private static DateTime[] ParseFileTimes(string units, int[] timeDeltas, int secondOffset=0)
+    {
             // Reads a units string (e.g. "minutes since 2023-01-01 00:00:00.0")
             // and a series of integers, returns the corresponding vector of DateTimes
             int nTimes = timeDeltas.Length;
@@ -206,8 +205,8 @@ namespace LGTracer
             return timeVec;
         }
 
-        private static (double [], double[], int[], int[] ) ReadLatLon( DataSet ds, double[] lonLims, double[] latLims )
-        {
+    private static (double [], double[], int[], int[] ) ReadLatLon( DataSet ds, double[] lonLims, double[] latLims )
+    {
             Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
             double[] lonEdge,latEdge;
             float[] lonMids, latMids;
@@ -254,9 +253,8 @@ namespace LGTracer
             int[] latSet = [latFirst,latLast+1];
             return (lonEdge, latEdge, lonSet, latSet);
         }
-        public (double[], double[]) GetXYMesh()
-        {
+    public (double[], double[]) GetXYMesh()
+    {
             return (XEdge, YEdge);
         }
-    }
 }

@@ -1,114 +1,114 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 
-namespace LGTracer
+namespace LGTracer;
+
+// The Domain Manager is designed to handle everything which happens on the grid. It also specifies the limits of
+// the domain.
+public class DomainManager
 {
-    // The Domain Manager is designed to handle everything which happens on the grid. It also specifies the limits of
-    // the domain.
-    public class DomainManager
+
+    public double XMin
+    { get; protected set; }
+        
+    public double YMin
+    { get; protected set; }
+        
+    public double XMax
+    { get; protected set; }
+
+    public double YMax
+    { get; protected set; }
+
+    public int NX
+    { get; protected set; }
+
+    public int NY
+    { get; protected set; }
+
+    public int NLevels
+    { get; protected set; }
+
+    public double DX
+    { get; protected set; }
+
+    public double DY
+    { get; protected set; }
+
+    public double[] XLims
+    { get; protected set; }
+
+    public double[] YLims
+    { get; protected set; }
+        
+    public double[] XMesh
+    { get; protected set; }
+        
+    public double[] XMids
+    { get; protected set; }
+
+    public double[] YMesh
+    { get; protected set; }
+
+    public double[] YMids
+    { get; protected set; }
+
+    public double[] BoundaryLengths
+    { get; protected set; }
+
+    public Vector2[] BoundaryNormals
+    { get; protected set; }
+
+    public Vector2[] BoundaryPosts
+    { get; protected set; }
+
+    protected int[,] BoundaryFaceIndices
+    { get; set; }
+        
+    public int[,] BaseLevel
+    { get; protected set; }
+
+    public int[,] CeilingLevel
+    { get; protected set; }
+
+    // Meteorological data
+    public double[,,] XSpeedXYP => Meteorology.UWindXYP;
+
+    public double[,,] YSpeedXYP => Meteorology.VWindXYP;
+
+    public double[,,] PressureVelocityXYP => Meteorology.PressureVelocityXYP;
+
+    public double[,] SurfacePressureXY => Meteorology.SurfacePressureXY;
+
+    public double[,,] TemperatureXYP => Meteorology.TemperatureXYP;
+
+    public double[,,] SpecificHumidityXYP => Meteorology.SpecificHumidityXYP;
+        
+    // Derived variables
+    public double[,,] PressureEdgeXYPe
+    { get; protected set; }
+
+    // Vertical indexing
+    public double PBase
+    { get; protected set; }
+
+    public double PCeiling
+    { get; protected set; }
+
+    protected double[] AP
+    { get; set; }
+
+    protected double[] BP
+    { get; set; }
+
+    public double[,] CellArea
+    { get; protected set; }
+        
+    private MetManager Meteorology
+    { get; set; }
+
+    public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors, MetManager meteorology)
     {
-
-        public double XMin
-        { get; protected set; }
-        
-        public double YMin
-        { get; protected set; }
-        
-        public double XMax
-        { get; protected set; }
-
-        public double YMax
-        { get; protected set; }
-
-        public int NX
-        { get; protected set; }
-
-        public int NY
-        { get; protected set; }
-
-        public int NLevels
-        { get; protected set; }
-
-        public double DX
-        { get; protected set; }
-
-        public double DY
-        { get; protected set; }
-
-        public double[] XLims
-        { get; protected set; }
-
-        public double[] YLims
-        { get; protected set; }
-        
-        public double[] XMesh
-        { get; protected set; }
-        
-        public double[] XMids
-        { get; protected set; }
-
-        public double[] YMesh
-        { get; protected set; }
-
-        public double[] YMids
-        { get; protected set; }
-
-        public double[] BoundaryLengths
-        { get; protected set; }
-
-        public Vector2[] BoundaryNormals
-        { get; protected set; }
-
-        public Vector2[] BoundaryPosts
-        { get; protected set; }
-
-        protected int[,] BoundaryFaceIndices
-        { get; set; }
-        
-        public int[,] BaseLevel
-        { get; protected set; }
-
-        public int[,] CeilingLevel
-        { get; protected set; }
-
-        // Meteorological data
-        public double[,,] XSpeedXYP => Meteorology.UWindXYP;
-
-        public double[,,] YSpeedXYP => Meteorology.VWindXYP;
-
-        public double[,,] PressureVelocityXYP => Meteorology.PressureVelocityXYP;
-
-        public double[,] SurfacePressureXY => Meteorology.SurfacePressureXY;
-
-        public double[,,] TemperatureXYP => Meteorology.TemperatureXYP;
-
-        public double[,,] SpecificHumidityXYP => Meteorology.SpecificHumidityXYP;
-        
-        // Derived variables
-        public double[,,] PressureEdgeXYPe
-        { get; protected set; }
-
-        // Vertical indexing
-        public double PBase
-        { get; protected set; }
-
-        public double PCeiling
-        { get; protected set; }
-
-        protected double[] AP
-        { get; set; }
-
-        protected double[] BP
-        { get; set; }
-
-        public double[,] CellArea
-        { get; protected set; }
-        
-        private MetManager Meteorology
-        { get; set; }
-
-        public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors, MetManager meteorology)
-        {
             // Set up the vertical coordinates
             // NB: PBase and PCeiling indicate where we cull, not the vertical
             // extent of the meteorological data
@@ -211,9 +211,9 @@ namespace LGTracer
             UpdateMeteorology();
         }
 
-        [MemberNotNull(nameof(CellArea))]
-        private void SetCellAreas()
-        {
+    [MemberNotNull(nameof(CellArea))]
+    private void SetCellAreas()
+    {
             double[] yRad = new double[NY + 1];
             for (int i=0; i<(NY+1); i++)
             {
@@ -236,8 +236,8 @@ namespace LGTracer
             }
         }
 
-        public void UpdateMeteorology()
-        {
+    public void UpdateMeteorology()
+    {
             // Update derived quantities
             UpdatePressures();
 
@@ -273,8 +273,8 @@ namespace LGTracer
             }
         }
 
-        public (double, double, double) VelocityFromFixedSpaceArray( double x, double y, double pressure, bool noConvert=false)
-        {
+    public (double, double, double) VelocityFromFixedSpaceArray( double x, double y, double pressure, bool noConvert=false)
+    {
             // Extract the velocity vector from an array
             // Values in m/s
             // Inefficient as we repeat the neighbor calculation
@@ -293,8 +293,8 @@ namespace LGTracer
             return (dxdt, dydt, dpdt);
         }
 
-        public double NearestNeighbor2D( double x, double y, double[,] valueArray)
-        {
+    public double NearestNeighbor2D( double x, double y, double[,] valueArray)
+    {
             // Ignore pressure for now
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
@@ -305,8 +305,8 @@ namespace LGTracer
             return valueArray[yIndex,xIndex];
         }
 
-        public double NearestNeighbor3D( double x, double y, double pressure, double[,,] valueArray)
-        {
+    public double NearestNeighbor3D( double x, double y, double pressure, double[,,] valueArray)
+    {
             // Ignore pressure for now
             // Extract the velocity vector from an array
             // Assumes constant X spacing and constant Y spacing
@@ -322,9 +322,9 @@ namespace LGTracer
             return valueArray[pIndex,yIndex,xIndex];
         }
 
-        [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals),nameof(BoundaryFaceIndices))]
-        private void CreateBoundary()
-        {
+    [MemberNotNull(nameof(BoundaryPosts),nameof(BoundaryNormals),nameof(BoundaryFaceIndices))]
+    private void CreateBoundary()
+    {
             // Create two arrays of 2-element vectors representing the boundary edge locations and the boundary normal vectors
             // Vector2 is float only - do some conversions
             int xPosts = NX + 1;
@@ -402,8 +402,8 @@ namespace LGTracer
             }
         }
 
-        public (Vector2[], double[], int[], int[], int) GetBoundaryVelocities()
-        {
+    public (Vector2[], double[], int[], int[], int) GetBoundaryVelocities()
+    {
             // This needs to return four arrays, each the same length (one entry per boundary "face"):
             //  * Boundary velocity (u,v)
             //  * Face area (in Pa*m) within the domain
@@ -495,8 +495,8 @@ namespace LGTracer
             return (vBoundary, faceAreas, boundaryIndices, levelIndices, nFaces);
         }
 
-        public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
-        {
+    public (double[], double[], double[], double) SeedBoundary(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
+    {
             // TODO: Calculate weights by going vertically from BaseLevel into CeilingLevel
             // Use fractional overlap in pressure and then just calculate weights as before
             // Seed the domain boundaries proportional to mass flow rate
@@ -576,8 +576,8 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[], double[], double) SeedPressureBoundaries(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
-        {
+    public (double[], double[], double[], double) SeedPressureBoundaries(double kgPerPoint, double dt, Random RNG, double massSurplus = 0.0)
+    {
             // Seed the upper and lower domain boundaries proportional to vertical mass flow rate
             // Position along boundary for each cell is random
             int nFaces = NX * NY;
@@ -674,8 +674,8 @@ namespace LGTracer
             return (xVals, yVals, pressureVals, massSurplus);
         }
 
-        public (double[], double[], double[]) MapRandomToXYP( long nPoints, Random rng )
-        {
+    public (double[], double[], double[]) MapRandomToXYP( long nPoints, Random rng )
+    {
             // Scatter randomly throughout domain
             double xSpan = XMax - XMin;
             double xStart = XMin;
@@ -696,8 +696,8 @@ namespace LGTracer
             return (xInitial, yInitial, pressureInitial);
         }
 
-        public void UpdatePressures()
-        {
+    public void UpdatePressures()
+    {
             // Calculate pressures at grid cell edges given surface pressures
             // AP and surfacePressure must be in the same units
             int nY = SurfacePressureXY.GetLength(0);
@@ -717,5 +717,4 @@ namespace LGTracer
                 }
             }
         }
-    }
 }
