@@ -359,7 +359,7 @@ public abstract class PointManager
             // that may not be straightforward
             for (int k = 0; k < nProperties; k++)
             {
-                properties[k][i] = GetPromotedProperty(point, PropertyNames[k]);
+                properties[k][i] = point.GetProperty(PropertyNames[k]);
             }
             i++;
         }
@@ -375,8 +375,10 @@ public abstract class PointManager
         }
     }
 
+    /*
     public virtual double GetPromotedProperty(IAdvected point, string property)
     {
         return point.GetProperty(property);
     }
+    */
 }

@@ -43,9 +43,4 @@ public class PointManagerDense : PointManager
         point.SpecificHumidity = specificHumidity;
         return point;
     }
-        
-    public override double GetPromotedProperty(IAdvected point, string property)
-    {
-        return ((LGAirMass)point).GetProperty(property);
-    }
 }

@@ -38,11 +38,6 @@ public class PointManagerFlight : PointManager
         AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
             [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
     }
-    
-    public override double GetPromotedProperty(IAdvected point, string property)
-    {
-        return ((LGPointConnected)point).GetProperty(property);
-    }
 
     public void PrintFlights()
     {
