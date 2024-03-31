@@ -59,8 +59,8 @@ namespace LGTracer
             List<PointManager> pointManagers = [];
 
             // Which point properties will we output?
-            string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
-            string[] flightsPropertyNames = ["temperature", "relative_humidity_ice","segment_length","segment_stretch","segment_tail_x","segment_tail_y","segment_tail_p"];
+            //string[] densePropertyNames = ["temperature", "relative_humidity_ice", "relative_humidity_liquid", "specific_humidity"];
+            //string[] flightsPropertyNames = ["temperature", "relative_humidity_ice","segment_length","segment_stretch","segment_tail_x","segment_tail_y","segment_tail_p"];
             
             // Use a master RNG to generate seeds predictably
             Random masterRNG;
@@ -92,7 +92,7 @@ namespace LGTracer
                     configOptions.PointsDense.OutputFilename);
                 PointManager pointManager = new PointManagerDense(configOptions.PointsDense.Max, domainManager,
                     outputFileName, includeCompression: configOptions.PointsDense.AdiabaticCompression,
-                    propertyNames: densePropertyNames, rng: pmRNG, kgPerPoint: kgPerPoint);
+                    propertyNames: configOptions.PointsDense.OutputVariables, rng: pmRNG, kgPerPoint: kgPerPoint);
 
                 // Scatter N points randomly over the domain
                 (double[] xInitial, double[] yInitial, double[] pInitial) =
@@ -118,7 +118,7 @@ namespace LGTracer
                 PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
                     outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
                     includeCompression: configOptions.PointsFlights.AdiabaticCompression,
-                    propertyNames: flightsPropertyNames);
+                    propertyNames: configOptions.PointsFlights.OutputVariables);
 
                 if (configOptions.PointsFlights.ScheduleFilename != null)
                 {

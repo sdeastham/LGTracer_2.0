@@ -57,6 +57,7 @@
         public long? Max = 0;
         public bool AdiabaticCompression = true;
         public string OutputFilename = "default_output.nc";
+        public string[] OutputVariables = [];
 
         public bool Active => (Max == null || Max > 0);
     }
