@@ -45,12 +45,14 @@ public class LGSegment
             return _YMidpoint;
         }
     }
+
     protected bool Stale { get; private set; }
     
     public LGSegment(LGPointConnected head, LGPointConnected tail, uint uniqueId, string source="UNKNOWN")
     {
         Head = head;
         Tail = tail;
+        Stale = true;
         UpdateProperties();
         InitialSegmentLength = SegmentLength;
         HeadUpdated = false;
