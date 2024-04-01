@@ -16,7 +16,8 @@ public class PointManagerFlight : PointManager
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
         bool verboseOutput = false, bool includeCompression = false, string[]? propertyNames = null,
-        bool contrailSimulation = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
+        bool contrailSimulation = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
+        propertyNames)
     {
         LastSeedTime = initialSeedTime;
         FlightTable = [];
@@ -29,7 +30,7 @@ public class PointManagerFlight : PointManager
     {
         if (ContrailSimulation)
         {
-            return new LGContrail(VelocityCalc,IncludeCompression);
+            return new LGContrail(VelocityCalc, IncludeCompression);
         }
         else
         {
@@ -56,7 +57,8 @@ public class PointManagerFlight : PointManager
             Console.WriteLine($"Flight {flightName}");
             foreach (FlightSegment segment in flight.SegmentList)
             {
-                Console.WriteLine($" --> Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
+                Console.WriteLine(
+                    $" --> Flight segment {segment.FlightID} with {segment.WaypointsRemaining} waypoints");
                 foreach (FlightSegment.Waypoint waypoint in segment.Waypoints)
                 {
                     Console.WriteLine(
@@ -89,13 +91,14 @@ public class PointManagerFlight : PointManager
         int nSegments = lons.Length - 1;
         // Auto-generate a label if one is not provided
         var flightLabelSafe = flightLabel ?? $"{lons[0]}/{lats[0]}_{lons[nSegments]}/{lats[nSegments]}_{dateTimes[0]}";
-        
+
         // Check that we don't already have this flight in the table
         if (FlightTable.ContainsKey(flightLabelSafe))
         {
             throw new ArgumentException($"Flight label {flightLabelSafe} duplicated");
         }
-        FlightTable.Add(flightLabelSafe,new Flight());
+
+        FlightTable.Add(flightLabelSafe, new Flight());
 
         for (int i = 0; i < nSegments; i++)
         {
@@ -145,7 +148,18 @@ public class PointManagerFlight : PointManager
         FlightTable[flightLabel].SegmentList.AddLast(seg);
     }
 
-    public override void Seed(double dt)
+    public override IAdvected NextPoint(double x, double y, double pressure)
+    {
+        LGContrail point = (LGContrail)base.NextPoint(x, y, pressure);
+        double temperature = Domain.NearestNeighbor3D(x,y,pressure,Domain.TemperatureXYP);
+        // TODO: Communicate current ambient humidity
+        //double specificHumidity = Domain.NearestNeighbor3D(x,y,pressure,Domain.SpecificHumidityXYP);
+        point.Temperature = temperature;
+        point.InitiateContrail(0.35, 1.0e14, 1.0, 830e3, 1.0);
+        return point;
+    }
+
+public override void Seed(double dt)
     {
         DateTime endTime = LastSeedTime + TimeSpan.FromSeconds(dt);
         foreach (string flightLabel in FlightTable.Keys)

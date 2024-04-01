@@ -33,7 +33,7 @@ public class PointManagerDense : PointManager
         CreatePointSet(xSetV, ySetV, pSetV);
     }
 
-    public override LGPoint NextPoint(double x, double y, double pressure)
+    public override IAdvected NextPoint(double x, double y, double pressure)
     {
         LGAirMass point = (LGAirMass)base.NextPoint(x, y, pressure);
         // Set point properties based on local values#

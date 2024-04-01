@@ -14,7 +14,7 @@ public class LGContrail : LGPointConnected
     private double AirMass => AirDensity * CrossSectionArea; // Kilograms per meter
     private double WaterVapourMass; // Kilograms per meter
     private double IceMass => CrystalCount * CrystalRadius * CrystalRadius * CrystalRadius * Math.PI * (4.0/3.0);
-    private double Temperature;
+    public double Temperature;
     private double AirDensity => Pressure * 28.97e-3 / (Physics.RGasUniversal * Temperature); // kg/m3
 
     private const double GammaRatio = 0.4 / 1.4;
