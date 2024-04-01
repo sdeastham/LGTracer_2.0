@@ -213,7 +213,16 @@ public abstract class PointManager
         // Advances all active points one time step
         foreach (IAdvected point in ActivePoints)
         {
+            LGPoint lgp = (LGPoint)point;
+            if (double.IsNaN(lgp.X))
+            {
+                bool what;
+            }
             point.Advance(dt, Domain);
+            if (double.IsNaN(lgp.X))
+            {
+                bool what;
+            }
         }
     }
 

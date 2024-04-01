@@ -158,10 +158,10 @@ public class PointManagerFlight : PointManager
     public override IAdvected NextPoint(double x, double y, double pressure)
     {
         LGContrail point = (LGContrail)base.NextPoint(x, y, pressure);
-        // TODO: Communicate current ambient humidity
         point.Temperature = Domain.NearestNeighbor3D(x,y,pressure,Domain.TemperatureXYP);
         point.AmbientSpecificHumidity = Domain.NearestNeighbor3D(x,y,pressure,Domain.SpecificHumidityXYP); 
-        point.InitiateContrail(0.35, 1.0e14, 1.0, 830e3, 1.0);
+        point.InitiateContrail(0.35, 1.0e14, 1.0, 265.0, 0.7,
+            waterVapourEmissionsIndex: 1.223, lowerHeatingValue: 43.2e6);
         return point;
     }
 

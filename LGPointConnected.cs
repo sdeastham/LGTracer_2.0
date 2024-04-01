@@ -17,15 +17,17 @@ public class LGPointConnected(
     private LGPointConnected? Next;
     protected LGSegment? Segment;
 
-    public void Connect(LGPointConnected? predecessor, uint? segmentID=null, string segmentSource="UNKNOWN")
+    public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN")
     {
         Previous = predecessor;
-        if (Previous != null)
+        if (Previous == null) { return; }
+        Previous.Next = this;
+        // Cannot create a segment if the previous point is inactive
+        if (Previous.Active)
         {
-            Previous.Next = this;
+            // Use the point ID if no segment ID is given
+            CreateSegment(segmentID ?? this.UID, segmentSource);
         }
-        // Use the point ID if no segment ID is given
-        CreateSegment(segmentID ?? this.UID, segmentSource);
     }
 
     public override void Deactivate()
@@ -58,7 +60,6 @@ public class LGPointConnected(
 
     public void DestroySegment()
     {
-        if (Previous == null) { return; }
         // Delete the segment
         Segment = null;
     }

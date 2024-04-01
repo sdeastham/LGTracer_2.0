@@ -33,6 +33,7 @@
                        "segment_tail_x",
                        "segment_tail_y",
                        "segment_tail_p",
+                       "contrail_ice_mass",
                        "contrail_cross_section_area"]
     contrail-simulation: true
  domain:

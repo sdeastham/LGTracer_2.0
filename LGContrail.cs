@@ -4,36 +4,58 @@ namespace LGTracer;
 
 public class LGContrail : LGPointConnected
 {
-    // Trapezoidal model for the contrail?
+    // Explicitly-controlled valuables
     private readonly bool IncludeCompression;
     private double CrystalRadius; // Meters
     private double CrystalCount; // Crystals per meter
     private double CrossSectionArea; // Meters squared
     private double Depth; // Meters
     public double AmbientSpecificHumidity; // Fraction
+    public double Temperature;
+    private double WaterVapourMass; // Kilograms per meter
+    // Derived properties for the plume itself
     public double SpecificHumidity => WaterVapourMass / AirMass;
     public double RelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, SpecificHumidity);
     public double RelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, SpecificHumidity);
+    private double AirDensity => Pressure * 28.97e-3 / (Physics.RGasUniversal * Temperature); // kg/m3
+    private double AirMass => AirDensity * CrossSectionArea; // Kilograms per meter
+    private double IceMass => CrystalCount * CrystalRadius * CrystalRadius * CrystalRadius * Math.PI * (4.0/3.0);
+    // Derived plume quantities relating to the total amount of water available
+    private double TotalWaterMass => IceMass + WaterVapourMass;
+    public double TotalRelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, TotalWaterMass/AirMass);
+    // Derived ambient air properties
     public double AmbientRelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, AmbientSpecificHumidity);
     public double AmbientRelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, AmbientSpecificHumidity);
-    private double AirMass => AirDensity * CrossSectionArea; // Kilograms per meter
-    private double WaterVapourMass; // Kilograms per meter
-    private double IceMass => CrystalCount * CrystalRadius * CrystalRadius * CrystalRadius * Math.PI * (4.0/3.0);
-    public double Temperature;
-    private double AirDensity => Pressure * 28.97e-3 / (Physics.RGasUniversal * Temperature); // kg/m3
-
+    // Constants
     private const double GammaRatio = 0.4 / 1.4;
+    private double WaterVapourEmissionsIndex = 1.223; // kg H2O per kg fuel
+    private double LowerHeatingValue = 43.2e6; // J/kg
+    
+    public Func<double, double, double, (double, double, double)> VelocityCalcNoSettling { get; protected set; }
 
     public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression) :
         base(vCalc)
     {
+        // Override vCalc to allow for inclusion of a settling speed
+        //VelocityCalcNoSettling = vCalc;
+        //VelocityCalc = VelocityCalcWithSettling;
         IncludeCompression = includeCompression;
         ZeroContrail();
     }
 
-    public void InitiateContrail(double efficiency, double numberEmissionsIndex, double activationFraction,
-        double airSpeed, double fuelFlowRate, double waterVapourEmissionsIndex=1.223, double lowerHeatingValue = 43.2e3)
+    private (double, double, double) VelocityCalcWithSettling(double x, double y, double pressure)
     {
+        (double dxdt, double dydt, double dpdt) = VelocityCalcNoSettling(x, y, pressure);
+        double dpdtSettling = 0.0;
+        return (dxdt, dydt, dpdt + dpdtSettling);
+    }
+    
+    public void InitiateContrail(double efficiency, double numberEmissionsIndex, double activationFraction,
+        double airSpeed, double fuelFlowRate, double waterVapourEmissionsIndex=1.223, double lowerHeatingValue = 43.2e6)
+    {
+        // Set up the contrail key values
+        LowerHeatingValue = lowerHeatingValue;
+        WaterVapourEmissionsIndex = waterVapourEmissionsIndex;
         // Do we pass the Schmidt-Appleman Criterion?
         double criticalTemperatureDelta = CriticalTemperatureDelta(efficiency);
         if (criticalTemperatureDelta >= 0.0)
@@ -50,7 +72,30 @@ public class LGContrail : LGPointConnected
         CrystalCount = particleCount * activationFraction;
         CrystalRadius = 1.0e-9; // Just assume 1 nm to begin with. Assume soot is negligible
         CrossSectionArea = 100.0; // Assume crystals are spread over 100 m2 to begin with
-        WaterVapourMass = fuelPerMeter * waterVapourEmissionsIndex;
+        double fuelWaterVapourMass = fuelPerMeter * waterVapourEmissionsIndex;
+        double ambientWaterVapourMass = AmbientSpecificHumidity * AirMass;
+        WaterVapourMass = fuelWaterVapourMass + ambientWaterVapourMass;
+        // Subtract ice already on the crystals
+        WaterVapourMass -= IceMass;
+    }
+
+    private static double CalculateDynamicViscosity(double temperature)
+    {
+        // Sutherland (1893), "The viscosity of gases and molecular force"
+        // Units are Pa.s
+        return 1.458e-6 * Math.Pow(temperature, 1.5) / (temperature + 110.4);
+    }
+    
+    private static double CalculateSettlingVelocity(double particleRadius, double dynamicViscosity)
+    {
+        // Stokes law for terminal velocity.
+        // Valid for r < 0.03 mm (Lohmann et al 2016)
+        // particleRadius in m
+        // dynamic viscosity in Pa.s
+        // Value returned is in meters per second
+        const double particleDensity = 1000.0; // kg/m3
+        const double preFactor = ( 2.0 / 9.0 ) * particleDensity * Physics.G0;
+        return preFactor * particleRadius * particleRadius / dynamicViscosity;
     }
 
     private void ZeroContrail()
@@ -65,13 +110,13 @@ public class LGContrail : LGPointConnected
 
     private double CriticalTemperatureDelta(double efficiency)
     {
-        return Temperature - CalculateCriticalTemperature(Pressure, Temperature, efficiency, AmbientRelativeHumidityLiquid);
+        return Temperature - CalculateCriticalTemperature(Pressure, Temperature, efficiency, AmbientRelativeHumidityLiquid,
+            WaterVapourEmissionsIndex,LowerHeatingValue);
     }
 
-    private static double CalculateCriticalTemperature(double pressure, double temperature, double efficiency, double relativeHumidity)
+    private static double CalculateCriticalTemperature(double pressure, double temperature, double efficiency, double relativeHumidity,
+        double waterVapourEmissionsIndex, double lowerHeatingValue)
     {
-        const double waterVapourEmissionsIndex = 1.223; // kg H2O per kg fuel
-        const double lowerHeatingValue = 43.2e6; // J/kg
         double mixingLineGradient = MixingLineGradient(pressure, efficiency, waterVapourEmissionsIndex, lowerHeatingValue);
         double thresholdTemperature = NewtonIterTlm(mixingLineGradient);
         double criticalTemperature = NewtonIterTlc(mixingLineGradient, thresholdTemperature, relativeHumidity);
@@ -285,6 +330,7 @@ public class LGContrail : LGPointConnected
         bool contrailActive = (Segment != null) && CheckValid();
         double oldLength = 1.0;
         double oldTemperature = 1.0;
+        double oldIceMass = IceMass;
         if (contrailActive)
         {
             oldTemperature = Temperature;
@@ -304,6 +350,17 @@ public class LGContrail : LGPointConnected
         double newVolume = previousVolume * densityRatio;
         double oldArea = CrossSectionArea;
         CrossSectionArea = newVolume / Segment.SegmentLength;
+        // TODO: Mixing with ambient air
+        // Calculate what the relative humidity with respect to ice would be if all water mass was vapour. If this is
+        // less than 1.0 then the contrail cannot be sustained
+        double availableIce = (1.0 - (1.0 / TotalRelativeHumidityIce)) * TotalWaterMass;
+        if (availableIce < 0.0)
+        {
+            ZeroContrail();
+            return;
+        }
+        // Grow/shrink crystals accordingly - assumes monodisperse
+        CrystalRadius = Math.Cbrt(0.75 * availableIce / (Math.PI * CrystalCount));
         // TODO: Incorporate simple diffusion and mixing
         // TODO: Incorporate ice crystal microphysics
         // TODO: Incorporate settling
