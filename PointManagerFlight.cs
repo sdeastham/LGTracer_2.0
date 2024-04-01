@@ -13,9 +13,11 @@ public class PointManagerFlight : PointManager
     public string SegmentsOutputFilename { get; protected set; }
     public bool ContrailSimulation { get; private set; }
 
+    private bool IncludeSettling;
+
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
-        bool verboseOutput = false, bool includeCompression = false, string[]? propertyNames = null,
+        bool verboseOutput = false, bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
         bool contrailSimulation = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
         propertyNames)
     {
@@ -24,6 +26,7 @@ public class PointManagerFlight : PointManager
         PointPeriod = pointPeriod;
         SegmentsOutputFilename = segmentsOutputFilename;
         ContrailSimulation = contrailSimulation;
+        IncludeSettling = includeSettling;
         // Run contrail test suite
         /*
         if (ContrailSimulation && !LGContrail.TestSAC(true))
@@ -37,7 +40,7 @@ public class PointManagerFlight : PointManager
     {
         if (ContrailSimulation)
         {
-            return new LGContrail(VelocityCalc, IncludeCompression);
+            return new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling);
         }
         else
         {

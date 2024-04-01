@@ -113,6 +113,7 @@ public class Program
             PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
                 outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
                 contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
+                includeSettling: configOptions.PointsFlights.IncludeSettling,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                 propertyNames: configOptions.PointsFlights.OutputVariables);
 

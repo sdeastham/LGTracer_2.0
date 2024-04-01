@@ -20,7 +20,7 @@
                         "relative_humidity_liquid",
                         "specific_humidity"]
  points-flights:
-    schedule-filename: "schedule_single.csv"
+    schedule-filename: "schedule.csv"
     airports-filename: "airports.csv"
     segments-filename: null
     max: null
@@ -35,7 +35,9 @@
                        "segment_tail_p",
                        "contrail_ice_mass",
                        "contrail_cross_section_area"]
+    # Contrail options
     contrail-simulation: true
+    include-settling: true
  domain:
    east-limit: -80.0
    west-limit: 15.0

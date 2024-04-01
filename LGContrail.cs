@@ -33,12 +33,19 @@ public class LGContrail : LGPointConnected
     
     public Func<double, double, double, (double, double, double)> VelocityCalcNoSettling { get; protected set; }
 
-    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression) :
+    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression, bool includeSettling) :
         base(vCalc)
     {
         // Override vCalc to allow for inclusion of a settling speed
         VelocityCalcNoSettling = vCalc;
-        VelocityCalc = VelocityCalcWithSettling;
+        if (includeSettling)
+        {
+            VelocityCalc = VelocityCalcWithSettling;
+        }
+        else
+        {
+            VelocityCalc = VelocityCalcNoSettling;
+        }
         IncludeCompression = includeCompression;
         ZeroContrail();
     }
@@ -342,6 +349,7 @@ public class LGContrail : LGPointConnected
         double oldLength = 1.0;
         double oldTemperature = 1.0;
         double oldIceMass = IceMass;
+        double oldAmbientSpecificHumidity = AmbientSpecificHumidity;
         if (contrailActive)
         {
             oldTemperature = Temperature;
@@ -360,6 +368,8 @@ public class LGContrail : LGPointConnected
             Temperature *= Math.Pow(Pressure/oldPressure,GammaRatio);
         }
         if (!contrailActive) return;
+        
+        // Apply expansion and stretching to the contrail
         // Old air density (in mol/m3) divided by new air density
         double densityRatio = (oldPressure * Temperature)/(Pressure * oldTemperature);
         // Need to conserve mass prior to diffusion calculation
@@ -367,7 +377,17 @@ public class LGContrail : LGPointConnected
         double newVolume = previousVolume * densityRatio;
         double oldArea = CrossSectionArea;
         CrossSectionArea = newVolume / Segment.SegmentLength;
-        // TODO: Mixing with ambient air
+        
+        // Mix in new air at the ambient humidity of the target location
+        // Very, very simple mixing; assume a 10% increase in air mass per hour, and that the additional air is ambient
+        double growthConstant = 3600.0 / Math.Log(1.0 + 0.10);
+        double growthFactor = Math.Exp(dt / growthConstant); // Factor increase in air mass due to "mixing"
+        // How much additional water will be brought in?
+        double meanAmbientSpecificHumidity = 0.5 * (AmbientSpecificHumidity + oldAmbientSpecificHumidity);
+        double newWater = meanAmbientSpecificHumidity * (growthFactor - 1.0) * AirMass;
+        WaterVapourMass += newWater;
+        CrossSectionArea *= growthFactor;
+            
         // Calculate what the relative humidity with respect to ice would be if all water mass was vapour. If this is
         // less than 1.0 then the contrail cannot be sustained
         double availableIce = (1.0 - (1.0 / TotalRelativeHumidityIce)) * TotalWaterMass;
@@ -380,7 +400,6 @@ public class LGContrail : LGPointConnected
         CrystalRadius = Math.Cbrt(0.75 * availableIce / (Math.PI * CrystalCount));
         // TODO: Incorporate simple diffusion and mixing
         // TODO: Incorporate ice crystal microphysics
-        // TODO: Incorporate settling
     }
 
     public override bool CheckValid()

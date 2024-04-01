@@ -75,6 +75,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public double PointSpacing = 60.0; // Seconds
     public string SegmentsOutputFilename = "segments_output.nc";
     public bool ContrailSimulation = false;
+    public bool IncludeSettling = false;
 }
 
 public class LGOptionsDomain
