@@ -37,8 +37,8 @@ public class LGContrail : LGPointConnected
         base(vCalc)
     {
         // Override vCalc to allow for inclusion of a settling speed
-        //VelocityCalcNoSettling = vCalc;
-        //VelocityCalc = VelocityCalcWithSettling;
+        VelocityCalcNoSettling = vCalc;
+        VelocityCalc = VelocityCalcWithSettling;
         IncludeCompression = includeCompression;
         ZeroContrail();
     }
@@ -323,6 +323,12 @@ public class LGContrail : LGPointConnected
         return (mixingLineError < maxError && tlmError < maxError && tlcError < maxError);
     }
 
+    public override void Deactivate()
+    {
+        ZeroContrail();
+        base.Deactivate();
+    }
+
     public override void Advance(double dt, DomainManager domain)
     {
         if (!Active) return;
@@ -335,6 +341,11 @@ public class LGContrail : LGPointConnected
         {
             oldTemperature = Temperature;
             oldLength = Segment.SegmentLength;
+        }
+        else if (!double.IsNaN(IceMass))
+        {
+            // Really we want this to happen when the segment is nullified - need a callback from the segment on death
+            ZeroContrail();
         }
         base.Advance(dt, domain);
         // Update temperature based on adiabatic compression

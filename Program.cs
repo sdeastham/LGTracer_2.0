@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Drawing;
 using MathNet.Numerics.Random;
 
 using YamlDotNet.Serialization;
@@ -197,7 +198,8 @@ public class Program
             }
             if (tCurr >= (tReport - 1.0e-10))
             {
-                Console.WriteLine($" --> Time at end of time step: {currentDate}. Current point count in first manager: {pointManagers.First().NActive,10:d}");
+                long totalActive = pointManagers.Sum(pm => pm.NActive);
+                Console.WriteLine($" --> Time at end of time step: {currentDate}. Point count across all managers: {totalActive,10:d}");
                 tReport += dtReport;
             }
         }

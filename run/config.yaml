@@ -20,7 +20,7 @@
                         "relative_humidity_liquid",
                         "specific_humidity"]
  points-flights:
-    schedule-filename: "schedule.csv"
+    schedule-filename: "schedule_single.csv"
     airports-filename: "airports.csv"
     segments-filename: null
     max: null
