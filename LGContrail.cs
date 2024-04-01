@@ -342,8 +342,9 @@ public class LGContrail : LGPointConnected
             oldTemperature = Temperature;
             oldLength = Segment.SegmentLength;
         }
-        else if (!double.IsNaN(IceMass))
+        else if (!double.IsNaN(CrystalCount))
         {
+            // Only called if contrail is not active, but hasn't been zeroed
             // Really we want this to happen when the segment is nullified - need a callback from the segment on death
             ZeroContrail();
         }
