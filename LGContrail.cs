@@ -299,10 +299,11 @@ public class LGContrail : LGPointConnected
         if (!contrailActive) return;
         // Old air density (in mol/m3) divided by new air density
         double densityRatio = (oldPressure * Temperature)/(Pressure * oldTemperature);
-        // For now, assume that the change in air density manifests only as a change in area
-        CrossSectionArea *= densityRatio;
-        // Apply the effect of segment stretching
-        CrossSectionArea *= oldLength / Segment.SegmentLength;
+        // Need to conserve mass prior to diffusion calculation
+        double previousVolume = CrossSectionArea * oldLength;
+        double newVolume = previousVolume * densityRatio;
+        double oldArea = CrossSectionArea;
+        CrossSectionArea = newVolume / Segment.SegmentLength;
         // TODO: Incorporate simple diffusion and mixing
         // TODO: Incorporate ice crystal microphysics
         // TODO: Incorporate settling
