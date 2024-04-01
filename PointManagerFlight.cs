@@ -24,6 +24,13 @@ public class PointManagerFlight : PointManager
         PointPeriod = pointPeriod;
         SegmentsOutputFilename = segmentsOutputFilename;
         ContrailSimulation = contrailSimulation;
+        // Run contrail test suite
+        /*
+        if (ContrailSimulation && !LGContrail.TestSAC(true))
+        {
+            throw new InvalidOperationException("Failed contrail test suite!");
+        }
+        */
     }
 
     protected override IAdvected CreatePoint()
@@ -151,10 +158,9 @@ public class PointManagerFlight : PointManager
     public override IAdvected NextPoint(double x, double y, double pressure)
     {
         LGContrail point = (LGContrail)base.NextPoint(x, y, pressure);
-        double temperature = Domain.NearestNeighbor3D(x,y,pressure,Domain.TemperatureXYP);
         // TODO: Communicate current ambient humidity
-        //double specificHumidity = Domain.NearestNeighbor3D(x,y,pressure,Domain.SpecificHumidityXYP);
-        point.Temperature = temperature;
+        point.Temperature = Domain.NearestNeighbor3D(x,y,pressure,Domain.TemperatureXYP);
+        point.AmbientSpecificHumidity = Domain.NearestNeighbor3D(x,y,pressure,Domain.SpecificHumidityXYP); 
         point.InitiateContrail(0.35, 1.0e14, 1.0, 830e3, 1.0);
         return point;
     }
