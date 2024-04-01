@@ -46,7 +46,12 @@ public class LGContrail : LGPointConnected
     private (double, double, double) VelocityCalcWithSettling(double x, double y, double pressure)
     {
         (double dxdt, double dydt, double dpdt) = VelocityCalcNoSettling(x, y, pressure);
-        double dpdtSettling = 0.0;
+        // Calculate settling velocity in m/s
+        double dzdtSettling = CalculateSettlingVelocity(CrystalRadius, CalculateDynamicViscosity(Temperature));
+        // Convert to Pa/s - use hydrostatic assumption and assume changes are small during the given time period (!)
+        // dp/dz = -rho * g
+        // dp/dt = dz/dt * (-rho * g)
+        double dpdtSettling = dzdtSettling * Physics.G0 * -1.0 * AirDensity;
         return (dxdt, dydt, dpdt + dpdtSettling);
     }
     
