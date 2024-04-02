@@ -26,6 +26,8 @@ public class LGContrail : LGPointConnected
     // Derived ambient air properties
     public double AmbientRelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, AmbientSpecificHumidity);
     public double AmbientRelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, AmbientSpecificHumidity);
+    // Diagnostic quantities only
+    private double LastSettlingVelocity;
     // Constants
     private const double GammaRatio = 0.4 / 1.4;
     private double WaterVapourEmissionsIndex = 1.223; // kg H2O per kg fuel
@@ -55,6 +57,8 @@ public class LGContrail : LGPointConnected
         (double dxdt, double dydt, double dpdt) = VelocityCalcNoSettling(x, y, pressure);
         // Calculate settling velocity in m/s
         double dzdtSettling = CalculateSettlingVelocity(CrystalRadius, CalculateDynamicViscosity(Temperature));
+        // Store for diagnostics
+        LastSettlingVelocity = dzdtSettling;
         // Convert to Pa/s - use hydrostatic assumption and assume changes are small during the given time period (!)
         // dp/dz = -rho * g
         // dp/dt = dz/dt * (-rho * g)
@@ -89,6 +93,7 @@ public class LGContrail : LGPointConnected
         WaterVapourMass = fuelWaterVapourMass + ambientWaterVapourMass;
         // Subtract ice already on the crystals
         WaterVapourMass -= IceMass;
+        LastSettlingVelocity = 0.0;
     }
 
     private static double CalculateDynamicViscosity(double temperature)
@@ -118,6 +123,7 @@ public class LGContrail : LGPointConnected
         CrossSectionArea = double.NaN;
         CrystalCount = double.NaN;
         CrystalRadius = double.NaN;
+        LastSettlingVelocity = double.NaN;
     }
 
     private double CriticalTemperatureDelta(double efficiency)
@@ -361,7 +367,10 @@ public class LGContrail : LGPointConnected
             // Really we want this to happen when the segment is nullified - need a callback from the segment on death
             ZeroContrail();
         }
+        
+        // Perform the standard advection calculation
         base.Advance(dt, domain);
+        
         // Update temperature based on adiabatic compression
         if (IncludeCompression)
         {
@@ -435,6 +444,9 @@ public class LGContrail : LGPointConnected
                     return CrystalRadius;
                 case "icemass":
                     return IceMass;
+                case "settlingspeed":
+                case "settlingvelocity":
+                    return LastSettlingVelocity;
                 default:
                     throw new ArgumentException($"LGContrail does not contain property {property}");
             }

@@ -9,7 +9,7 @@
    reporting: 180.0
    storage: 5.0
  points-dense:
-    max: null
+    max: 0
     initial: 1500
     # Calculate delta T due to pressure change?
     adiabatic-compression: true
@@ -34,6 +34,8 @@
                        "segment_tail_y",
                        "segment_tail_p",
                        "contrail_ice_mass",
+                       "contrail_settling_velocity",
+                       "contrail_crystal_radius",
                        "contrail_cross_section_area"]
     # Contrail options
     contrail-simulation: true
