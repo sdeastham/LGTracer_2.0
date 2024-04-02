@@ -120,7 +120,10 @@ public class DomainManager
     private MetManager Meteorology
     { get; set; }
 
-    public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors, MetManager meteorology)
+    private bool BoxHeightsNeeded;
+
+    public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors,
+        MetManager meteorology, bool boxHeightsNeeded = false)
     {
         // Set up the vertical coordinates
         // NB: PBase and PCeiling indicate where we cull, not the vertical
@@ -218,12 +221,15 @@ public class DomainManager
         CeilingLevel = new int[NY,NX];
         
         // If they are being used...
-        // TODO: Avoid allocation if not required
-        BoxHeightXYP = new double[NLevels, NY, NX];
-        WaterSaturationPressure = new double[NLevels, NY, NX];
-        BoxEdgeAltitudeXYPe = new double[NLevels + 1, NY, NX];
-        BruntVaisalaXYP = new double[NLevels, NY, NX];
-        
+        BoxHeightsNeeded = boxHeightsNeeded;
+        if (BoxHeightsNeeded)
+        {
+            BoxHeightXYP = new double[NLevels, NY, NX];
+            WaterSaturationPressure = new double[NLevels, NY, NX];
+            BoxEdgeAltitudeXYPe = new double[NLevels + 1, NY, NX];
+            BruntVaisalaXYP = new double[NLevels, NY, NX];
+        }
+
         // Store the met manager for future reference
         Meteorology = meteorology;
         
@@ -295,6 +301,7 @@ public class DomainManager
 
         // Update the box heights
         // TODO: Avoid if not needed
+        if (!BoxHeightsNeeded) { return; }
         double oneMinusH2OPerAir = 1.0 - (Physics.WaterMolarMass / Physics.AirMolarMass);
         // Convenient factor - gas constant in dry air divided by g
         double rdg0 = Physics.RGasUniversal / (Physics.AirMolarMass * Physics.G0);
@@ -306,16 +313,17 @@ public class DomainManager
                 for (int k = 0; k < NLevels; k++)
                 {
                     double localT = TemperatureXYP[k, j, i];
-                    WaterSaturationPressure[k, j, i] = Physics.SaturationPressureLiquid(localT);
-                    double pressureMidpoint = 0.5 * (PressureEdgeXYPe[k + 1, j, i] + PressureEdgeXYPe[k, j, i]);
-                    double waterVMR = Physics.WaterMolarConversion * SpecificHumidityXYP[k, j, i] /
-                                      (1.0 - SpecificHumidityXYP[k, j, i]);
-                    double waterMolFraction = waterVMR / (1.0 + waterVMR);
-                    double potentialTemperature =
-                        TemperatureXYP[k, j, i] * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
-                    double virtualTemperature = TemperatureXYP[k, j, i] / (1.0 - waterMolFraction * oneMinusH2OPerAir);
-                    double boxHeight = rdg0 * virtualTemperature *
-                                       Math.Log(PressureEdgeXYPe[k, j, i] / PressureEdgeXYPe[k + 1, j, i]);
+                    double localSpecificHumidity = SpecificHumidityXYP[k, j, i];
+                    double upperP = PressureEdgeXYPe[k + 1, j, i];
+                    double lowerP = PressureEdgeXYPe[k, j, i];
+                    //WaterSaturationPressure[k, j, i] = Physics.SaturationPressureLiquid(localT);
+                    double pressureMidpoint = 0.5 * (upperP + lowerP);
+                    double waterVolumetricMixingRatio = Physics.WaterMolarConversion * localSpecificHumidity /
+                                      (1.0 - localSpecificHumidity);
+                    double waterMolFraction = waterVolumetricMixingRatio / (1.0 + waterVolumetricMixingRatio);
+                    //ouble potentialTemperature = localT * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
+                    double virtualTemperature = localT / (1.0 - waterMolFraction * oneMinusH2OPerAir);
+                    double boxHeight = rdg0 * virtualTemperature * Math.Log(lowerP / upperP);
                     BoxHeightXYP[k, j, i] = boxHeight;
                     BoxEdgeAltitudeXYPe[k + 1, j, i] = BoxEdgeAltitudeXYPe[k, j, i] + boxHeight;
                 }

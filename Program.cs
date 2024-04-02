@@ -41,11 +41,15 @@ public class Program
         double dtReport = 60.0 * configOptions.Timesteps.Reporting; // How often to report to the user?
             
         DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
+        
+        // Check if the domain manager will need to calculate box heights (expensive)
+        bool boxHeightsNeeded = configOptions.PointsFlights is { Active: true, ComplexContrails: true };
 
         // Set up the meteorology and domain
         MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate);
         (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
-        DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP, meteorology);
+        DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP,
+            meteorology, boxHeightsNeeded);
 
         // Time handling
         double nDays = (endDate - startDate).TotalDays; // Days to run

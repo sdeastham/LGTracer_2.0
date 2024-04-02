@@ -76,6 +76,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public string SegmentsOutputFilename = "segments_output.nc";
     public bool ContrailSimulation = false;
     public bool IncludeSettling = false;
+    public bool ComplexContrails = false;
 }
 
 public class LGOptionsDomain
