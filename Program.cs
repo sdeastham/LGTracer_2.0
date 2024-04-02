@@ -131,7 +131,7 @@ public class Program
                     configOptions.PointsFlights.ScheduleFilename);
                 string airportFileName = Path.Join(configOptions.InputOutput.InputDirectory,
                     configOptions.PointsFlights.AirportsFilename);
-                pointManager.ReadScheduleFile(scheduleFileName,airportFileName);
+                pointManager.ReadScheduleFile(scheduleFileName, airportFileName, startDate, endDate);
             }
                 
             if (configOptions.PointsFlights.SegmentsFilename != null)
@@ -164,7 +164,7 @@ public class Program
         int nSteps = 0;
         var watch = new Stopwatch();
         Dictionary<string,Stopwatch> subwatches = [];
-        foreach (string watchName in (string[])["Point physics", "Met advance", "Met update", "Archiving", "File writing"])
+        foreach (string watchName in (string[])["Point seeding", "Point physics", "Point culling", "Met advance", "Met update", "Archiving", "File writing"])
         {
             subwatches.Add(watchName, new Stopwatch());   
         }
@@ -184,20 +184,24 @@ public class Program
                 domainManager.UpdateMeteorology();
                 subwatches["Met update"].Stop();
             }
-
-            subwatches["Point physics"].Start();
+            
             foreach (PointManager pointManager in pointManagers)
             {
                 // Seed new points
+                subwatches["Point seeding"].Start();
                 pointManager.Seed(dt);
+                subwatches["Point seeding"].Stop();
                     
                 // Do the actual work
+                subwatches["Point physics"].Start();
                 pointManager.Advance(dt);
+                subwatches["Point physics"].Stop();
 
                 // TODO: Allow for this to not happen every time step
+                subwatches["Point culling"].Start();
                 pointManager.Cull();
+                subwatches["Point culling"].Stop();
             }
-            subwatches["Point physics"].Stop();
 
             nSteps++;
             tCurr = (iter+1) * dt;

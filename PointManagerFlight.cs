@@ -107,8 +107,9 @@ public class PointManagerFlight : PointManager
         {
             throw new ArgumentException($"Flight label {flightLabelSafe} duplicated");
         }
-
-        FlightTable.Add(flightLabelSafe, new Flight());
+        
+        // Assume that the flight date times are in order
+        FlightTable.Add(flightLabelSafe, new Flight(dateTimes[0]));
 
         for (int i = 0; i < nSegments; i++)
         {
@@ -119,6 +120,8 @@ public class PointManagerFlight : PointManager
                 lats[i + 1], lons[i + 1], dateTimes[i + 1],
                 0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod, flightLabelSafe);
         }
+        
+        // If you want to be very safe, you can run FlightTable[flightLabelSafe].SetTakeoff()
     }
 
     public void AddFlightSegmentOrdered(double startLatitude, double startLongitude, DateTime startDateTime,
@@ -174,6 +177,8 @@ public override void Seed(double dt)
         foreach (string flightLabel in FlightTable.Keys)
         {
             Flight flight = FlightTable[flightLabel];
+            if (flight.Takeoff > endTime) { continue; }
+            int nWaypointsLeft = 0;
             // For each flight segment, check if there are any new seeds which should be created
             foreach (FlightSegment flightSegment in flight.SegmentList)
             {
@@ -184,7 +189,10 @@ public override void Seed(double dt)
                     newPoint.Connect(flight.LastPoint, null, flightLabel);
                     flight.UpdateLast(newPoint);
                 }
+                nWaypointsLeft += flightSegment.WaypointsRemaining;
             }
+            // Don't need to keep this around if there are no waypoints left to seed
+            if (nWaypointsLeft == 0) { FlightTable.Remove(flightLabel); }
         }
 
         LastSeedTime = endTime;
@@ -224,8 +232,10 @@ public override void Seed(double dt)
         throw new NotImplementedException("Segment file reading not yet implemented");
     }
 
-    public void ReadScheduleFile(string scheduleFilePath, string airportFilePath)
+    public void ReadScheduleFile(string scheduleFilePath, string airportFilePath, DateTime? simulationStart=null, DateTime? simulationEnd=null )
     {
+        bool cullByStart = (simulationStart != null);
+        bool cullByEnd = (simulationEnd != null);
         // First read in the airport data file
         //List<Airport> airports = [];
         Dictionary<string, Airport> airports = [];
@@ -292,6 +302,10 @@ public override void Seed(double dt)
                 // so we add one day to compensate
                 dtFull = $"{fields[stopDateIndex]} {fields[timeIndex]}Z";
                 DateTime endDate = DateTime.ParseExact(dtFull, "u", cultureInfo) + TimeSpan.FromDays(1);
+                if ((cullByStart && endDate < simulationStart) || (cullByEnd && startDate >= simulationEnd))
+                {
+                    continue;
+                }
                 // Get the weekday indicators
                 string weekdaysString = fields[weekdayIndex];
                 bool[] weekdays = new bool[7];
@@ -305,6 +319,7 @@ public override void Seed(double dt)
                 {
                     DateTime currentDate = startDate + TimeSpan.FromDays(iDay);
                     if (!weekdays[(int)currentDate.DayOfWeek]) { continue; }
+                    if ((cullByStart && currentDate < simulationStart) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
                     SimulateFlight(originAirport.Longitude, originAirport.Latitude,
                         destinationAirport.Longitude, destinationAirport.Latitude,
                         currentDate, 820.0, null, PointPeriod);
@@ -335,11 +350,24 @@ public override void Seed(double dt)
         public string NameICAO = nameICAO;
         public double Elevation = elevation;
     }
-    protected class Flight
+    protected class Flight(DateTime? takeoff = null)
     {
         public LinkedList<FlightSegment> SegmentList = [];
         public LGPointConnected? LastPoint { get; protected set; } = null;
+        public DateTime? Takeoff = takeoff;
 
+        public void SetTakeoff()
+        {
+            foreach (FlightSegment segment in SegmentList)
+            {
+                DateTime segmentTime = segment.StartDateTime;
+                if (Takeoff == null || segmentTime < Takeoff)
+                {
+                    Takeoff = (DateTime)segmentTime;
+                }
+            }
+        }
+        
         public void UpdateLast(LGPointConnected newPoint)
         {
             LastPoint = newPoint;
