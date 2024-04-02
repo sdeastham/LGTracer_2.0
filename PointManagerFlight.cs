@@ -252,6 +252,8 @@ public override void Seed(double dt)
         }
 
         // Now the schedule file
+        int nEntries = 0;
+        int nFlights = 0;
         using (TextFieldParser csvParser = new TextFieldParser(scheduleFilePath))
         {
             csvParser.CommentTokens = ["#"];
@@ -262,7 +264,9 @@ public override void Seed(double dt)
             string[] colNames = csvParser.ReadFields();
             int originIndex = Array.IndexOf(colNames, "Origin airport");
             int destinationIndex = Array.IndexOf(colNames, "Destination airport");
-            int dateIndex = Array.IndexOf(colNames, "Takeoff date");
+            int startDateIndex = Array.IndexOf(colNames, "First date");
+            int stopDateIndex = Array.IndexOf(colNames, "Last date");
+            int weekdayIndex = Array.IndexOf(colNames, "Weekdays");
             int timeIndex = Array.IndexOf(colNames, "Takeoff time");
             // Also Airline and Equipment, but not currently used
 
@@ -279,15 +283,39 @@ public override void Seed(double dt)
                 {
                     continue;
                 }
-
-                // Build a full date/time string
-                string dtFull = $"{fields[dateIndex]} {fields[timeIndex]}Z";
-                DateTime takeoff = DateTime.ParseExact(dtFull, "u", cultureInfo);
-                // Add flight
-                SimulateFlight(originAirport.Longitude, originAirport.Latitude,
-                    destinationAirport.Longitude, destinationAirport.Latitude,
-                    takeoff, 820.0, null, PointPeriod);
+                // Keep track of how many schedule entries we have read
+                nEntries++;
+                // Date of first takeoff
+                string dtFull = $"{fields[startDateIndex]} {fields[timeIndex]}Z";
+                DateTime startDate = DateTime.ParseExact(dtFull, "u", cultureInfo);
+                // Date from which there will be no more takeoffs (file lists the last takeoff rather than the stop date
+                // so we add one day to compensate
+                dtFull = $"{fields[stopDateIndex]} {fields[timeIndex]}Z";
+                DateTime endDate = DateTime.ParseExact(dtFull, "u", cultureInfo) + TimeSpan.FromDays(1);
+                // Get the weekday indicators
+                string weekdaysString = fields[weekdayIndex];
+                bool[] weekdays = new bool[7];
+                for (int i = 0; i < 7; i++)
+                {
+                    // NB: First entry means Sunday
+                    weekdays[i] = weekdaysString[i] ==  'T';
+                }
+                // Add flight each valid day
+                for (int iDay = 0; iDay < (endDate - startDate).TotalDays; iDay++)
+                {
+                    DateTime currentDate = startDate + TimeSpan.FromDays(iDay);
+                    if (!weekdays[(int)currentDate.DayOfWeek]) { continue; }
+                    SimulateFlight(originAirport.Longitude, originAirport.Latitude,
+                        destinationAirport.Longitude, destinationAirport.Latitude,
+                        currentDate, 820.0, null, PointPeriod);
+                    nFlights++;
+                }
             }
+        }
+
+        if (VerboseOutput)
+        {
+            Console.WriteLine($"Schedule parsed. Found {nFlights} flights in {nEntries} schedule entries.");
         }
     }
 
