@@ -9,7 +9,10 @@ public class LGContrail : LGPointConnected
     private double CrystalRadius; // Meters
     private double CrystalCount; // Crystals per meter
     private double CrossSectionArea; // Meters squared
-    private double Depth; // Meters
+    private double UpperWidth; // Meters
+    private double Depth; // Meters, vertical
+    private double LowerWidth; // Meters
+    private double SkewOffset; // Meters
     public double AmbientSpecificHumidity; // Fraction
     public double Temperature;
     private double WaterVapourMass; // Kilograms per meter
@@ -26,6 +29,8 @@ public class LGContrail : LGPointConnected
     // Derived ambient air properties
     public double AmbientRelativeHumidityLiquid => Physics.RelativeHumidityLiquid(Temperature, Pressure, AmbientSpecificHumidity);
     public double AmbientRelativeHumidityIce => Physics.RelativeHumidityIce(Temperature, Pressure, AmbientSpecificHumidity);
+    // Derived geometric quantities
+    private double Circumference => CalculateCircumference();
     // Diagnostic quantities only
     private double LastSettlingVelocity;
     // Constants
@@ -96,6 +101,13 @@ public class LGContrail : LGPointConnected
         LastSettlingVelocity = 0.0;
     }
 
+    private double CalculateCircumference()
+    {
+        double depthSquared = Depth * Depth;
+        double rightBase = LowerWidth + SkewOffset - UpperWidth;
+        return LowerWidth + UpperWidth + Math.Sqrt(depthSquared + SkewOffset * SkewOffset) +
+               Math.Sqrt(depthSquared + rightBase * rightBase);
+    }
     private static double CalculateDynamicViscosity(double temperature)
     {
         // Sutherland (1893), "The viscosity of gases and molecular force"
@@ -152,8 +164,8 @@ public class LGContrail : LGPointConnected
          Value returned is in units of partial pressure of H2O (Pa) per K. Default values for kerosene above taken from
          Schumann (1996) Table 1. Defaults for cp and the molar mass ratio likewise.
          */
-        const double cpExhaust = 1004; // J kg-1 K-1
-        const double molarMassRatio = 0.622; // Ratio between molar masses of water vapor (~18e-3) and air (~29e-3)
+        const double cpExhaust = Physics.CpAir; // J kg-1 K-1
+        const double molarMassRatio = 1.0/Physics.WaterMolarConversion; // Ratio between molar masses of water vapor (~18e-3) and air (~29e-3) (0.622)
         return waterVapourEmissionsIndex * pressure * cpExhaust /
                (molarMassRatio * lowerHeatingValue * (1.0 - efficiency));
     }

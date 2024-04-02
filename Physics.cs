@@ -4,13 +4,16 @@ namespace LGTracer;
 
 public class Physics
 {
-        
-    private const double WaterMolarMass = 18.01528 * 1.0e-3; // kg/mol
-    private const double AirMolarMass = 28.964 * 1.0e-3; // kg/mol
-    private const double WaterMolarConversion = AirMolarMass / WaterMolarMass;
+    public const double EarthRadius = PhysConstants.EarthRadius * 1000.0; // m
+    public const double Deg2Rad = Math.PI / 180.0;
+    public const double Rad2Deg = 180.0 / Math.PI;
+    public const double WaterMolarMass = 18.01528 * 1.0e-3; // kg/mol
+    public const double AirMolarMass = 28.964 * 1.0e-3; // kg/mol
+    public const double WaterMolarConversion = AirMolarMass / WaterMolarMass;
     public const double RGasUniversal = PhysConstants.RGasUniversal; // J/K/mol
     public const double G0 = PhysConstants.G0; // m/s2
     public const double Avogadro = PhysConstants.Avogadro; // molec/mol
+    public const double CpAir = 1004.0; // J/kg/K
         
     public static double SaturationPressureLiquid(double temperature)
     {
