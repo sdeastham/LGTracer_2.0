@@ -224,12 +224,6 @@ public class Program
                 tReport += dtReport;
             }
         }
-        watch.Stop();
-        long elapsedTimeLong = watch.ElapsedMilliseconds;
-        double elapsedTime = (double)elapsedTimeLong;
-        double msPerStep = elapsedTime/nSteps;
-        Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
-
         subwatches["File writing"].Start();
         foreach (PointManager pointManager in pointManagers)
         {
@@ -240,6 +234,13 @@ public class Program
                     : $"Could not write output to {pointManager.OutputFilename}");
         }
         subwatches["File writing"].Stop();
+        
+        watch.Stop();
+        long elapsedTimeLong = watch.ElapsedMilliseconds;
+        double elapsedTime = (double)elapsedTimeLong;
+        double msPerStep = elapsedTime/nSteps;
+        Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
+        
         foreach (string watchName in subwatches.Keys)
         {
             double subwatchTime = (double)subwatches[watchName].ElapsedMilliseconds;
