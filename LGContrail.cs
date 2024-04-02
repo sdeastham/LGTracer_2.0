@@ -284,7 +284,7 @@ public class LGContrail : LGPointConnected
                                     (pSat - relativeHumidity * Physics.SaturationPressureLiquid(criticalTemperature)) /
                                     mixingLineGradient;
         int nAttempts = 0;
-        int nMax = 50;
+        int nMax = 150;
         while (Math.Abs(criticalTemperature - updatedTemperature) > errorThreshold)
         {
             if (nAttempts > nMax)
