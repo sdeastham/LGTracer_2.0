@@ -163,6 +163,12 @@ public class Program
         // Set up timing
         int nSteps = 0;
         var watch = new Stopwatch();
+        Dictionary<string,Stopwatch> subwatches = [];
+        foreach (string watchName in (string[])["Point physics", "Met advance", "Met update", "Archiving", "File writing"])
+        {
+            subwatches.Add(watchName, new Stopwatch());   
+        }
+        
         watch.Start();
         Console.WriteLine("Beginning trajectory calculation");
         for (int iter=0;iter<iterMax; iter++)
@@ -170,11 +176,16 @@ public class Program
             // Update meteorological data
             if (updateMeteorology)
             {
+                subwatches["Met advance"].Start();
                 meteorology.AdvanceToTime(currentDate);
+                subwatches["Met advance"].Stop();
                 // Calculate derived quantities
+                subwatches["Met update"].Start();
                 domainManager.UpdateMeteorology();
+                subwatches["Met update"].Stop();
             }
 
+            subwatches["Point physics"].Start();
             foreach (PointManager pointManager in pointManagers)
             {
                 // Seed new points
@@ -186,6 +197,7 @@ public class Program
                 // TODO: Allow for this to not happen every time step
                 pointManager.Cull();
             }
+            subwatches["Point physics"].Stop();
 
             nSteps++;
             tCurr = (iter+1) * dt;
@@ -196,10 +208,12 @@ public class Program
             // to compensate for imperfect float comparisons
             if (tCurr >= (tStorage - 1.0e-10))
             {
+                subwatches["Archiving"].Start();
                 foreach (PointManager pointManager in pointManagers)
                 {
                     pointManager.ArchiveConditions(tCurr);
                 }
+                subwatches["Archiving"].Stop();
                 tStorage += dtStorage;
                 nStored += 1;
             }
@@ -216,6 +230,7 @@ public class Program
         double msPerStep = elapsedTime/nSteps;
         Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
 
+        subwatches["File writing"].Start();
         foreach (PointManager pointManager in pointManagers)
         {
             bool success = pointManager.WriteToFile();
@@ -223,6 +238,12 @@ public class Program
                 success
                     ? $"Output data with {nStored} samples [max points stored: {pointManager.MaxStoredPoints}] successfully written to {pointManager.OutputFilename}"
                     : $"Could not write output to {pointManager.OutputFilename}");
+        }
+        subwatches["File writing"].Stop();
+        foreach (string watchName in subwatches.Keys)
+        {
+            double subwatchTime = (double)subwatches[watchName].ElapsedMilliseconds;
+            Console.WriteLine($" --> {watchName,20:s}: {subwatchTime/1000.0,12:f2} seconds ({100.0 * subwatchTime / elapsedTime,10:f2}% of total)");
         }
     }
 
