@@ -24,7 +24,7 @@ public class Program
         LGOptions configOptions = ReadConfig(configFile);
             
         // Extract and store relevant variables
-        bool debug = configOptions.Debug;
+        bool verbose = configOptions.Verbose;
         bool updateMeteorology = configOptions.TimeDependentMeteorology;
 
         // Specify the domain
@@ -93,7 +93,8 @@ public class Program
                 configOptions.PointsDense.OutputFilename);
             PointManager pointManager = new PointManagerDense(configOptions.PointsDense.Max, domainManager,
                 outputFileName, includeCompression: configOptions.PointsDense.AdiabaticCompression,
-                propertyNames: configOptions.PointsDense.OutputVariables, rng: pmRNG, kgPerPoint: kgPerPoint);
+                propertyNames: configOptions.PointsDense.OutputVariables, rng: pmRNG, kgPerPoint: kgPerPoint,
+                verboseOutput: configOptions.Verbose);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial, double[] pInitial) =
@@ -119,7 +120,8 @@ public class Program
                 contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
                 includeSettling: configOptions.PointsFlights.IncludeSettling,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
-                propertyNames: configOptions.PointsFlights.OutputVariables);
+                propertyNames: configOptions.PointsFlights.OutputVariables,
+                verboseOutput: configOptions.Verbose);
 
             if (configOptions.PointsFlights.ScheduleFilename != null)
             {

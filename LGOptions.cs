@@ -25,7 +25,7 @@ public class LGOptions
 
     public bool TimeDependentMeteorology
     { get; private set; } = true;
-    public bool Debug
+    public bool Verbose
     { get; private set; } = false;
 
     public LGOptions()

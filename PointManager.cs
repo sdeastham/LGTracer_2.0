@@ -50,11 +50,11 @@ public abstract class PointManager
     private List<List<double[]>> PropertyHistory;
 
     private List<string> PropertyNames;
-
+    
     public long MaxStoredPoints
     { get; private set; }
 
-    private bool VerboseOutput;
+    protected bool VerboseOutput;
 
     // Do we calculate the effect of compression on temperature?
     protected bool IncludeCompression;
@@ -62,7 +62,8 @@ public abstract class PointManager
     public string OutputFilename
     { get; private set; }
 
-    public PointManager( long? maxPoints, DomainManager domain, string filename, bool verboseOutput=false, bool includeCompression=false, string[]? propertyNames=null )
+    public PointManager(long? maxPoints, DomainManager domain, string filename, bool verboseOutput = false,
+        bool includeCompression = false, string[]? propertyNames = null)
     {
         // UIDs start from 1 (0 reserved for inactive points)
         nextUID = 1;

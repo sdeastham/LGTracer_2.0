@@ -57,4 +57,4 @@
  # Update meteorology over time?
  time-dependent-meteorology: true
  # More verbose output?
- debug: false
+ verbose: true
