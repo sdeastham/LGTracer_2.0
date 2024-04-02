@@ -49,14 +49,15 @@ public class PointManagerFlight : PointManager
     }
 
     public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
-        DateTime takeoffTime, double cruiseSpeedKPH, string? flightLabel = null, double pointPeriod = 60.0 * 5.0)
+        DateTime takeoffTime, double cruiseSpeedKPH, string? flightLabel = null, double pointPeriod = 60.0 * 5.0,
+        IAircraft? equipment = null)
     {
         // Crude flight simulation between two airports. Currently only handles cruise
         double cruiseAltitude = 10.0; // km
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
         AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
-            [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod);
+            [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod, equipment);
     }
 
     public void PrintFlights()
@@ -79,7 +80,7 @@ public class PointManagerFlight : PointManager
     }
 
     public void AddFlight(double[] lons, double[] lats, double[] pressureAltitudes, DateTime[] dateTimes,
-        string? flightLabel = null, double pointPeriod = 60.0 * 5.0)
+        string? flightLabel = null, double pointPeriod = 60.0 * 5.0, IAircraft? equipment = null)
     {
         /* Add a flight as a series of waypoints
          Vector inputs (one value per waypoint):
@@ -118,7 +119,8 @@ public class PointManagerFlight : PointManager
             double flightSpeed = 3600.0 * gcd / segmentDuration;
             AddFlightSegmentOrdered(lats[i], lons[i], dateTimes[i],
                 lats[i + 1], lons[i + 1], dateTimes[i + 1],
-                0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod, flightLabelSafe);
+                0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod,
+                flightLabelSafe, equipment);
         }
         
         // If you want to be very safe, you can run FlightTable[flightLabelSafe].SetTakeoff()
@@ -126,19 +128,21 @@ public class PointManagerFlight : PointManager
 
     public void AddFlightSegmentOrdered(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
-        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel)
+        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
+        IAircraft? equipment = null)
     {
         // Convenience function - as long as flights are being added in full and their segments are added in order,
         // this will ensure that they are linked together
         Flight flight = FlightTable[flightLabel];
         LinkedListNode<FlightSegment>? node = flight.SegmentList.Last;
         AddFlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
-            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel);
+            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, equipment);
     }
 
     public void AddFlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
-        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel)
+        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
+        IAircraft? equipment = null)
     {
         // Define a new flight segment, to take place at constant cruise pressure altitude and flight speed
         // Units:
@@ -149,7 +153,7 @@ public class PointManagerFlight : PointManager
         // * pointPeriod                Seconds between production of a new point
         // The first point will be produced in the first timestep which contains the start time
         FlightSegment seg = new FlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
-            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel);
+            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, equipment);
         // Remove any waypoints which would already have been deployed
         seg.CullByDatetime(LastSeedTime);
         // Add to the table of flights
@@ -278,7 +282,8 @@ public override void Seed(double dt)
             int stopDateIndex = Array.IndexOf(colNames, "Last date");
             int weekdayIndex = Array.IndexOf(colNames, "Weekdays");
             int timeIndex = Array.IndexOf(colNames, "Takeoff time");
-            // Also Airline and Equipment, but not currently used
+            int equipmentIndex = Array.IndexOf(colNames, "Equipment");
+            // Also Airline, but not currently used
 
             // Not entirely sure why this is needed
             CultureInfo cultureInfo = new CultureInfo("en-US");
@@ -388,11 +393,13 @@ public class FlightSegment
     public LinkedList<Waypoint> Waypoints { get; protected set; }
     public int WaypointsRemaining => Waypoints.Count;
     public string FlightID { get; private set; }
+
+    public IAircraft? Equipment;
     
     public FlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
         double cruisePressureAltitude, double flightSpeed, double pointPeriod,
-        string flightLabel = "UNKNOWN")
+        string flightLabel = "UNKNOWN", IAircraft? equipment = null)
     {
         StartDateTime = startDateTime;
         EndDateTime = endDateTime;
@@ -404,6 +411,7 @@ public class FlightSegment
         EndAltitudePa = cruisePressurePa;
         // A (hopefully!) unique identifier
         FlightID = flightLabel;
+        Equipment = equipment;
 
         // How far do we want to space the waypoints (in kilometers)?
         double waypointSpacing = flightSpeed * pointPeriod / 3600.0;
