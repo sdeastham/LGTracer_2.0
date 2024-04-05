@@ -3,6 +3,7 @@ using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
 
 using System.Diagnostics.CodeAnalysis;
+using SerializeNC;
 
 namespace LGTracer;
 

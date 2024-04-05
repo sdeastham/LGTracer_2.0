@@ -18,4 +18,10 @@
     <ProjectReference Include="..\AtmosTools\AtmosTools.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="SerializeNC">
+      <HintPath>..\SerializeNC\bin\net8.0\SerializeNC.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
