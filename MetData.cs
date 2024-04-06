@@ -1,12 +1,15 @@
+using System.Numerics;
+using System.Xml;
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
+using SerializeNC;
 
 namespace LGTracer;
 
 public interface IMetData
 {
-    void Update(DataSet ds);
+    void Update<T>(T dataSource);
     void SetTimeFraction(double timeFraction);
 }
 public abstract class MetData<T> : IMetData
@@ -41,12 +44,18 @@ public abstract class MetData<T> : IMetData
     public int NY
     { get; protected set; }
 
+    protected abstract void ShuffleLastToFirst();
     protected abstract void ReadData(DataSet ds);
+    protected abstract void ReadData(string fileTemplate);
 
     protected double ScaleValue;
     protected double OffsetValue;
 
-    protected MetData(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0)
+    protected bool SerializedData;
+    protected int Rank;
+    
+
+    protected MetData(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0, bool serializedData=false)
     {
         // Bounds of domain to be read in
         XBounds = xBounds;
@@ -69,14 +78,29 @@ public abstract class MetData<T> : IMetData
         // entry in FullData relevant to NextData, it gets reset to 1 each time a new file is read in.
         // If TimeIndex hits N+1, a new read operation is required.
         TimeIndex = TimesPerFile; // Forces read on next update
+        
+        // Will we use netCDF data or serialized?
+        SerializedData = serializedData;
+        Rank = 0;
     }
 
-    public void Update(DataSet ds)
+    public void Update<T2>(T2 dataSource)
     {
         if (TimeIndex >= TimesPerFile)
         {
             TimeIndex = 1;
-            ReadData(ds);
+            ShuffleLastToFirst();
+            switch (dataSource)
+            {
+                case DataSet:
+                    ReadData((DataSet)(object)dataSource!);
+                    break;
+                case string:
+                    ReadData((string)(object)dataSource);
+                    break;
+                default:
+                    throw new ArgumentException("Unrecognized data type for met update.");
+            }
         }
         else
         {
@@ -94,18 +118,16 @@ public abstract class MetData2D : MetData<double[,]>
 {
     public MetData2D(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
     {
+        Rank = 2;
         FullData = new double[TimesPerFile+1][,];
         for (int i=0; i<=TimesPerFile; i++)
         {
             FullData[i] = new double[NY,NX];
         }
     }
-    protected override void ReadData(DataSet ds)
-    {
-        // Reads in all time slices from the file
-        int lonFirst = XBounds[0];
-        int latFirst = YBounds[0];
 
+    protected override void ShuffleLastToFirst()
+    {
         // Cycle the last entry of FullData back to the first
         for (int i=0; i<NX; i++)
         {
@@ -114,11 +136,13 @@ public abstract class MetData2D : MetData<double[,]>
                 FullData[0][j,i] = FullData[TimesPerFile][j,i];
             }
         }
+    }
 
-        float[,,] rawData = ds.GetData<float[,,]>(FieldName);
-        for (int t=0; t<TimesPerFile; t++)
+    private void ScaleShiftData(float[,,] rawData)
+    {
+        for (int t = 0; t < TimesPerFile; t++)
         {
-            for (int i=0; i<NX; i++)
+            for (int i = 0; i < NX; i++)
             {
                 for (int j=0; j<NY; j++)
                 {
@@ -126,6 +150,17 @@ public abstract class MetData2D : MetData<double[,]>
                 }
             }
         }
+    }
+    
+    protected override void ReadData(DataSet ds)
+    {
+        ScaleShiftData(ds.GetData<float[,,]>(FieldName));
+    }
+
+    protected override void ReadData(string fileTemplate)
+    {
+        (_, float[,,] rawData) = NetcdfSerializer.Deserialize2D(string.Format(fileTemplate, FieldName));
+        ScaleShiftData(rawData);
     }
 }
     
@@ -143,35 +178,47 @@ public abstract class MetData3D : MetData<double[,,]>
             FullData[i] = new double[NZ,NY,NX];
         }
     }
-    protected override void ReadData(DataSet ds)
+    protected override void ShuffleLastToFirst()
     {
-        // Reads in all time slices from the file
         // Cycle the last entry of FullData back to the first
         for (int i=0; i<NX; i++)
         {
             for (int j=0; j<NY; j++)
             {
-                for (int k=0; k<NZ; k++)
+                for (int k = 0; k < NZ; k++)
                 {
-                    FullData[0][k,j,i] = FullData[TimesPerFile][k,j,i];
+                    FullData[0][k, j, i] = FullData[TimesPerFile][k, j, i];
                 }
             }
         }
+    }
 
-        float[,,,] rawData = ds.GetData<float[,,,]>(FieldName);
-        for (int t=0; t<TimesPerFile; t++)
+    private void ScaleShiftData(float[,,,] rawData)
+    {
+        for (int t = 0; t < TimesPerFile; t++)
         {
-            for (int i=0; i<NX; i++)
+            for (int i = 0; i < NX; i++)
             {
                 for (int j=0; j<NY; j++)
                 {
-                    for (int k=0; k<NZ; k++)
+                    for (int k = 0; k < NZ; k++)
                     {
-                        FullData[t+1][k,j,i] = (rawData[t,k,j+YBounds[0],i+XBounds[0]] * ScaleValue) + OffsetValue;
+                        FullData[t + 1][k, j, i] =
+                            (rawData[t, k, j + YBounds[0], i + XBounds[0]] * ScaleValue) + OffsetValue;
                     }
                 }
             }
         }
+    }
+    
+    protected override void ReadData(DataSet ds)
+    {
+        ScaleShiftData(ds.GetData<float[,,,]>(FieldName));
+    }
+
+    protected override void ReadData(string fileTemplate)
+    {
+        ScaleShiftData(NetcdfSerializer.Deserialize3D(string.Format(fileTemplate, FieldName)).Item2);
     }
 }
     
