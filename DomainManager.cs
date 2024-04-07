@@ -308,7 +308,11 @@ public class DomainManager
 
         // Update the box heights
         // TODO: Avoid if not needed
-        if (!BoxHeightsNeeded) { return; }
+        if (!BoxHeightsNeeded)
+        {
+            Stopwatches["Derived quantities"].Stop();
+            return;
+        }
         double oneMinusH2OPerAir = 1.0 - (Physics.WaterMolarMass / Physics.AirMolarMass);
         // Convenient factor - gas constant in dry air divided by g
         double rdg0 = Physics.RGasUniversal / (Physics.AirMolarMass * Physics.G0);
@@ -324,11 +328,11 @@ public class DomainManager
                     double upperP = PressureEdgeXYPe[k + 1, j, i];
                     double lowerP = PressureEdgeXYPe[k, j, i];
                     //WaterSaturationPressure[k, j, i] = Physics.SaturationPressureLiquid(localT);
-                    double pressureMidpoint = 0.5 * (upperP + lowerP);
+                    //double pressureMidpoint = 0.5 * (upperP + lowerP);
                     double waterVolumetricMixingRatio = Physics.WaterMolarConversion * localSpecificHumidity /
                                       (1.0 - localSpecificHumidity);
                     double waterMolFraction = waterVolumetricMixingRatio / (1.0 + waterVolumetricMixingRatio);
-                    //ouble potentialTemperature = localT * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
+                    //double potentialTemperature = localT * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
                     double virtualTemperature = localT / (1.0 - waterMolFraction * oneMinusH2OPerAir);
                     double boxHeight = rdg0 * virtualTemperature * Math.Log(lowerP / upperP);
                     BoxHeightXYP[k, j, i] = boxHeight;

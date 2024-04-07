@@ -172,6 +172,9 @@ public class Program
         tReport += dtReport;
         
         int nSteps = 0;
+        int nReports = 0;
+        double pointSum = 0;
+        bool accuratePointAverage = false;
         
         Console.WriteLine("Beginning trajectory calculation");
         for (int iter=0;iter<iterMax; iter++)
@@ -225,6 +228,13 @@ public class Program
                 long totalActive = pointManagers.Sum(pm => pm.NActive);
                 Console.WriteLine($" --> Time at end of time step: {currentDate}. Point count across all managers: {totalActive,10:d}");
                 tReport += dtReport;
+                pointSum += totalActive;
+                nReports++;
+            }
+            else if (accuratePointAverage)
+            {
+                long totalActive = pointManagers.Sum(pm => pm.NActive);
+                pointSum += totalActive;
             }
         }
         subwatches["File writing"].Start();
@@ -243,11 +253,30 @@ public class Program
         double elapsedTime = (double)elapsedTimeLong;
         double msPerStep = elapsedTime/nSteps;
         Console.WriteLine($"{nSteps} steps completed in {elapsedTime/1000.0,6:f1} seconds ({msPerStep,6:f2} ms per step)");
-        
+        int nPointSums = accuratePointAverage ? nSteps : nReports;
+        if (nPointSums >= 1)
+        {
+            Console.WriteLine($"Simulation average point count (at reporting times): {pointSum / nPointSums}");
+        }
+        else
+        {
+            Console.WriteLine("No point average calculated (simulation too short).");
+        }
+
         foreach (string watchName in subwatches.Keys)
         {
-            double subwatchTime = (double)subwatches[watchName].ElapsedMilliseconds;
-            Console.WriteLine($" --> {watchName,20:s}: {subwatchTime/1000.0,12:f2} seconds ({100.0 * subwatchTime / elapsedTime,10:f2}% of total)");
+            string watchOutput;
+            if (subwatches[watchName].IsRunning)
+            {
+                watchOutput = "error (watch still running)";
+            }
+            else
+            {
+                double subwatchTime = (double)subwatches[watchName].ElapsedMilliseconds;
+                watchOutput =
+                    $"{subwatchTime / 1000.0,12:f2} seconds ({100.0 * subwatchTime / elapsedTime,10:f2}% of total)";
+            }
+            Console.WriteLine($" --> {watchName,20:s}: {watchOutput}");
         }
     }
 
