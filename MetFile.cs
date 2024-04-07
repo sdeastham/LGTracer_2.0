@@ -390,27 +390,5 @@ public class MetFileSerial : MetFile
             (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
             NLevels = nLevels ?? 1;
         }
-        /*
-        // Parse the time data
-        string fileName = VariableFilePath("TIME");
-        DateTime[] timeVec = NetcdfSerializer.DeserializeTime(fileName);
-        int nTimes = timeVec.Length;
-        TimeVec = new DateTime[nTimes + 1];
-        for (int i = 0; i < nTimes; i++)
-        {
-            TimeVec[i+1] = timeVec[i] + TimeSpan.FromSeconds(SecondOffset);
-        }
-        TimeVec[0] = TimeVec[1] - (timeVec[1] - timeVec[0]);
-        if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
-        {
-            // Set up the domain too
-            float[] latMids = NetcdfSerializer.Deserialize1DNoTime(VariableFilePath("LAT1D"));
-            float[] lonMids = NetcdfSerializer.Deserialize1DNoTime(VariableFilePath("LON1D"));
-            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
-            // WARNING: This is hard coded for now because the files we are reading do not contain the necessary information
-            // TODO: Merge LON1D, LAT1D, TIME and number of levels into a DIMENSIONS file
-            NLevels = 72;
-        }
-        */
     }
 }
