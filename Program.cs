@@ -15,6 +15,16 @@ public class Program
         through space under the influence of a wind field. */
         Console.WriteLine("Initiating LGTracer program");
 
+        // Initialize timing
+        var watch = new Stopwatch();
+        watch.Start();
+        Dictionary<string,Stopwatch> subwatches = [];
+        foreach (string watchName in (string[])["Point seeding", "Point physics", "Point culling", "Met advance",
+                     "Derived quantities", "Met interpolate", "Archiving", "File writing"])
+        {
+            subwatches.Add(watchName, new Stopwatch());   
+        }
+        
         // Read in first argument as configuration file (or use default)
         string configFile = "config.yaml";
         if (args.Length > 0)
@@ -46,10 +56,10 @@ public class Program
         bool boxHeightsNeeded = configOptions.PointsFlights is { Active: true, ComplexContrails: true };
 
         // Set up the meteorology and domain
-        MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate);
+        MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate, subwatches);
         (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
         DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP,
-            meteorology, boxHeightsNeeded);
+            meteorology, subwatches, boxHeightsNeeded);
 
         // Time handling
         double nDays = (endDate - startDate).TotalDays; // Days to run
@@ -159,30 +169,18 @@ public class Program
 
         // Don't report at initialization
         tReport += dtReport;
-            
-        // Set up timing
-        int nSteps = 0;
-        var watch = new Stopwatch();
-        Dictionary<string,Stopwatch> subwatches = [];
-        foreach (string watchName in (string[])["Point seeding", "Point physics", "Point culling", "Met advance", "Met update", "Archiving", "File writing"])
-        {
-            subwatches.Add(watchName, new Stopwatch());   
-        }
         
-        watch.Start();
+        int nSteps = 0;
+        
         Console.WriteLine("Beginning trajectory calculation");
         for (int iter=0;iter<iterMax; iter++)
         {
             // Update meteorological data
             if (updateMeteorology)
             {
-                subwatches["Met advance"].Start();
                 meteorology.AdvanceToTime(currentDate);
-                subwatches["Met advance"].Stop();
                 // Calculate derived quantities
-                subwatches["Met update"].Start();
                 domainManager.UpdateMeteorology();
-                subwatches["Met update"].Stop();
             }
             
             foreach (PointManager pointManager in pointManagers)

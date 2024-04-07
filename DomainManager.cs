@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using AtmosTools;
@@ -122,9 +123,14 @@ public class DomainManager
 
     private bool BoxHeightsNeeded;
 
+    private Dictionary<string, Stopwatch> Stopwatches;
+
     public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors,
-        MetManager meteorology, bool boxHeightsNeeded = false)
+        MetManager meteorology, Dictionary<string, Stopwatch> stopwatches, bool boxHeightsNeeded = false)
     {
+        // Register stopwatches
+        Stopwatches = stopwatches;
+        
         // Set up the vertical coordinates
         // NB: PBase and PCeiling indicate where we cull, not the vertical
         // extent of the meteorological data
@@ -264,6 +270,7 @@ public class DomainManager
 
     public void UpdateMeteorology()
     {
+        Stopwatches["Derived quantities"].Start();
         // Update derived quantities
         UpdatePressures();
 
@@ -329,6 +336,7 @@ public class DomainManager
                 }
             }
         }
+        Stopwatches["Derived quantities"].Stop();
     }
 
     public (double, double, double) VelocityFromFixedSpaceArray( double x, double y, double pressure, bool noConvert=false)

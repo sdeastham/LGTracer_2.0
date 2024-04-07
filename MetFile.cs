@@ -1,49 +1,96 @@
+using System.Diagnostics;
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
 
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using SerializeNC;
 
 namespace LGTracer;
 
-public class MetFile
+public interface IMetFile
+{
+    public IMetData GetMetData(int i);
+    public void AdvanceToTime(DateTime newTime);
+    public (double[], double[]) GetXYMesh();
+    public void Initialize(string[] dataFields2D, string[] dataFields3D, bool timeInterp);
+    public void UpdateAllVars(bool readFile);
+    public void RegisterStopwatches(Dictionary<string, Stopwatch> stopwatches);
+}
+
+public static class MetFileFactory
+{
+    public static IMetFile CreateMetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D,
+        string[] dataFields3D, double[] xLim, double[] yLim, Dictionary<string, Stopwatch> stopwatches,
+        int secondOffset=0, bool timeInterp=true, bool useSerial=false)
+    {
+        IMetFile metFile;
+        if (useSerial)
+        {
+            metFile = new MetFileSerial(fileTemplate, firstTime, xLim, yLim, secondOffset);
+        }
+        else
+        {
+            metFile = new MetFileNetCDF(fileTemplate, firstTime, xLim, yLim, secondOffset);
+        }
+        metFile.RegisterStopwatches(stopwatches);
+        metFile.Initialize(dataFields2D, dataFields3D, timeInterp);
+        return metFile;
+    }
+}
+
+public abstract class MetFile : IMetFile
 {
     // The MetFile class holds all MetData variables
     // read from a single file. It is responsible for
     // keeping track of the dataset handle and updating
     // the variables as time proceeds
-    private DataSet DS;
-    private NetCDFUri DSUri;
-    private DateTime[] TimeVec;
-    private string FileTemplate;
-    private int SecondOffset; // Number of seconds to offset times which are read in
+    protected DateTime[] TimeVec;
+    protected string FileTemplate;
+    protected int SecondOffset; // Number of seconds to offset times which are read in
     public List<IMetData> DataVariables { get; private set; }
     public List<string> DataNames { get; private set; }
-    private int[] XBounds, YBounds;
-    private double[] XEdge, YEdge;
-    private double[] XLim, YLim;
-    private int NLevels;
-    private int TimeIndex;
-    private TimeSpan TimeDelta;
+    protected int[] XBounds, YBounds;
+    protected double[] XEdge, YEdge;
+    protected double[] XLim, YLim;
+    protected int NLevels;
+    protected int TimeIndex;
+    protected TimeSpan TimeDelta;
+    protected DateTime FirstTime;
+    protected double ScaleValue, OffsetValue;
 
-    public MetFile(string fileTemplate, DateTime firstTime, string[] dataFields2D, string[] dataFields3D,
-        double[] xLim, double[] yLim, int secondOffset=0, bool timeInterp=true)
+    protected DateTime LeftBracketTime => TimeVec[TimeIndex - 1];
+    protected DateTime RightBracketTime => TimeVec[TimeIndex];
+
+    private Dictionary<string, Stopwatch> Stopwatches;
+    public MetFile(string fileTemplate, DateTime firstTime, double[] xLim, double[] yLim, int secondOffset=0)
     {
+        FirstTime = firstTime;
         FileTemplate = fileTemplate;
         SecondOffset = secondOffset;
         // Set domain boundaries
         XLim = xLim;
         YLim = yLim;
-        // First read will also identify where, in this specific file's data,
-        // the X and Y bounds for reading are found
-        ReadFile(firstTime,true); // << Seems that this is not establishing DS?
-        int nTimes = TimeVec.Length;
         DataVariables = [];
         DataNames = [];
-        double scaleValue = 1.0;
-        double offsetValue = 0.0;
-        TimeIndex = 0;
+        ScaleValue = 1.0;
+        OffsetValue = 0.0;
+        // Corresponds to the _right bracket_ of the data (if interpolating)
+        TimeIndex = 1;
+    }
+
+    public void RegisterStopwatches(Dictionary<string, Stopwatch> stopwatches)
+    {
+        Stopwatches = stopwatches;
+    }
+    
+    public void Initialize(string[] dataFields2D, string[] dataFields3D, bool timeInterp=true)
+    {
+        // First read will also identify where, in this specific file's data,
+        // the X and Y bounds for reading are found
+        OpenFile(FirstTime,true); // << Seems that this is not establishing DS?
+        int nTimes = TimeVec.Length - 1;
         // Assume uniform spacing
         TimeDelta = TimeVec[1] - TimeVec[0];
         foreach (string varName in dataFields2D)
@@ -51,17 +98,12 @@ public class MetFile
             IMetData metVar;
             if (timeInterp)
             {
-                metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, ScaleValue, OffsetValue);
             }
             else
             {
-                metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, scaleValue, offsetValue);
+                metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, ScaleValue, OffsetValue);
             }
-
-            // Need to update twice to fill the initial data array
-            // and align to the first entry
-            metVar.Update(DS);
-            metVar.Update(DS);
             DataVariables.Add(metVar);
             DataNames.Add(varName);
         }
@@ -70,106 +112,98 @@ public class MetFile
             IMetData metVar;
             if (timeInterp)
             {
-                metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, scaleValue,
-                    offsetValue);
+                metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, ScaleValue,
+                    OffsetValue);
             }
             else
             {
-                metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, scaleValue, offsetValue);
+                metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, ScaleValue, OffsetValue);
             }
-
-            // Need to update twice to fill the initial data array
-            // and align to the first entry
-            metVar.Update(DS);
-            metVar.Update(DS);
             DataVariables.Add(metVar);
             DataNames.Add(varName);
         }
-        AdvanceToTime(firstTime, forceUpdate: true);
+        // Set the time index to zero; this forces an update
+        TimeIndex = 0;
+        AdvanceToTime(FirstTime);
+    }
+
+    public void UpdateAllVars(bool readFile)
+    {
+        foreach (IMetData metVar in DataVariables)
+        {
+            UpdateVar(metVar,readFile);
+        }
+    }
+
+    protected abstract void UpdateVar(IMetData metVar, bool readFile);
+
+    public IMetData GetMetData(int i)
+    {
+        return DataVariables[i];
     }
     
-    public void AdvanceToTime(DateTime newTime, bool forceUpdate = false)
+    public IMetData GetMetData(string varName)
+    {
+        int i = GetVarIndex(varName);
+        return DataVariables[i];
+    }
+
+    public int GetVarIndex(string varName)
+    {
+        return DataNames.FindIndex(a => a == varName);
+    }
+
+    public void AdvanceToTime(DateTime newTime)
     {
         // Scan through the current times
         // Track whether we need to update - this is important because in theory
         // we could end up with the same time index
-        bool updateFiles = forceUpdate;
-        while (TimeVec[TimeIndex + 1] < newTime)
+        Stopwatches["Met advance"].Start();
+        bool readFile = false;
+        while (newTime > TimeVec[TimeIndex]) // While the current time is AFTER the right bracket..
         {
-            updateFiles = true;
             TimeIndex++;
-            // If the time index now points to the final time in      // the vector, then we need to update the underlying
+            // If the time index now points to the final time in the vector, then we need to update the underlying
             // date structure
-            if (TimeIndex >= (TimeVec.Length - 1))
+            if (TimeIndex >= TimeVec.Length)
             {
-                DateTime nextTime = TimeVec[TimeVec.Length - 1] + TimeDelta;
-                ReadFile(nextTime, false);
-                TimeIndex = 0;
+                DateTime nextTime = TimeVec[^1] + TimeDelta;
+                OpenFile(nextTime, false);
+                // Since zero corresponds to the last time from the previous file
+                TimeIndex = 1;
+                // Variables need to read in new data
+                readFile = true;
             }
 
             // Update all the variables
             // An interface would be a good idea here...
-            foreach (IMetData metVar in DataVariables)
-            {
-                metVar.Update(DS);
-            }
+            UpdateAllVars(readFile);
         }
-        // To allow for interpolation. This could get quite expensive
-        // so first verify that it's actually going to be necessary
-        if (updateFiles)
+        Stopwatches["Met advance"].Stop();
+        // To allow for interpolation. This could get quite expensive, but only
+        // variables which do interpolate will do anything
+        Stopwatches["Met interpolate"].Start();
+        double newTimeFraction = IntervalFraction(newTime);
+        foreach (IMetData metVar in DataVariables)
         {
-            double newTimeFraction = IntervalFraction(newTime);
-            foreach (IMetData metVar in DataVariables)
-            {
-                metVar.SetTimeFraction(newTimeFraction);
-            }
+            metVar.SetTimeFraction(newTimeFraction);
         }
+        Stopwatches["Met interpolate"].Stop();
     }
 
-    private double IntervalFraction(DateTime targetTime)
+    protected double IntervalFraction(DateTime targetTime)
     {
         // How far through the current time interval is the proposed time?
-        return (targetTime - TimeVec[TimeIndex]).TotalSeconds / TimeDelta.TotalSeconds;
+        return (targetTime - TimeVec[TimeIndex-1]).TotalSeconds / TimeDelta.TotalSeconds;
     }
-    private string FillTemplate(DateTime targetTime)
+    protected string FillTemplate(DateTime targetTime)
     {
         return string.Format(FileTemplate,targetTime.Year,targetTime.Month,targetTime.Day);
     }
 
-    [MemberNotNull(nameof(DS),nameof(DSUri),nameof(TimeVec),nameof(XBounds),nameof(YBounds),nameof(XEdge),nameof(YEdge))]
-    private void ReadFile(DateTime targetTime, bool firstRead)
-    {
-        string fileName = FillTemplate(targetTime);
-        DSUri = new NetCDFUri
-        {
-            FileName = fileName,
-            OpenMode = ResourceOpenMode.ReadOnly
-        };
-        DS = DataSet.Open(DSUri);
-        // Parse the time data
-        int[] timeInts = DS.GetData<int[]>("time");
-        string timeUnits = DS.GetAttr<string>("time","units");
-        int nTimes = timeInts.Length;
-        TimeVec = ParseFileTimes(timeUnits,timeInts,SecondOffset);
-        // Philosophical question: who is handling all these boundaries? Feels like
-        // this is the domain manager's job
-        if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
-        {
-            // Set up the domain too
-            (XEdge, YEdge, XBounds, YBounds ) = ReadLatLon( DS, XLim, YLim );
-            if (DS.Variables.Contains("lev"))
-            {
-                float[] levels = DS.GetData<float[]>("lev");
-                NLevels = levels.Length;
-            }
-            else
-            {
-                NLevels = 0;
-            }
-        }
-    }
+    public abstract void OpenFile(DateTime targetTime, bool firstRead);
 
-    private static DateTime[] ParseFileTimes(string units, int[] timeDeltas, int secondOffset=0)
+    protected static DateTime[] ParseFileTimes(string units, int[] timeDeltas, int secondOffset=0)
     {
         // Reads a units string (e.g. "minutes since 2023-01-01 00:00:00.0")
         // and a series of integers, returns the corresponding vector of DateTimes
@@ -206,17 +240,12 @@ public class MetFile
         return timeVec;
     }
 
-    private static (double [], double[], int[], int[] ) ReadLatLon( DataSet ds, double[] lonLims, double[] latLims )
+    protected static (double [], double[], int[], int[] ) ParseLatLon( float[] lonMids, float[] latMids, double[] lonLims, double[] latLims )
     {
         Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
         double[] lonEdge,latEdge;
-        float[] lonMids, latMids;
         int nLon, nLat, lonFirst, latFirst, lonLast, latLast;
         double dLon, dLat, lonBase, latBase;
-
-        // Get the full dimension vectors
-        latMids = ds.GetData<float[]>("lat");
-        lonMids = ds.GetData<float[]>("lon");
 
         // Figure out which cells we need to keep in order to get all the data we need
         // Assume a fixed cell spacing for now
@@ -256,6 +285,115 @@ public class MetFile
     }
     public (double[], double[]) GetXYMesh()
     {
-            return (XEdge, YEdge);
+        return (XEdge, YEdge);
+    }
+}
+
+public class MetFileNetCDF : MetFile
+{
+    private DataSet DS;
+    private NetCDFUri DSUri;
+
+    public MetFileNetCDF(string fileTemplate, DateTime firstTime, double[] xLim, double[] yLim, int secondOffset = 0) :
+        base(fileTemplate, firstTime, xLim, yLim, secondOffset)
+    {
+        // No change
+    }
+
+    protected override void UpdateVar(IMetData metVar, bool readFile)
+    {
+        metVar.Update(DS,TimeIndex,readFile);
+    }
+    
+    public override void OpenFile(DateTime targetTime, bool firstRead)
+    {
+        string fileName = FillTemplate(targetTime);
+        DSUri = new NetCDFUri
+        {
+            FileName = fileName,
+            OpenMode = ResourceOpenMode.ReadOnly
+        };
+        DS = DataSet.Open(DSUri);
+        // Parse the time data
+        int[] timeInts = DS.GetData<int[]>("time");
+        string timeUnits = DS.GetAttr<string>("time","units");
+        int nTimes = timeInts.Length;
+        TimeVec = new DateTime[nTimes + 1];
+        DateTime[] timeVec = ParseFileTimes(timeUnits,timeInts,SecondOffset);
+        for (int i = 0; i < nTimes; i++)
+        {
+            TimeVec[i + 1] = timeVec[i];
         }
+        TimeVec[0] = TimeVec[1] - (timeVec[1] - timeVec[0]);
+        // Philosophical question: who is handling all these boundaries? Feels like
+        // this is the domain manager's job
+        if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
+        {
+            // Set up the domain too
+            float[] latMids = DS.GetData<float[]>("lat");
+            float[] lonMids = DS.GetData<float[]>("lon");
+            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
+            if (DS.Variables.Contains("lev"))
+            {
+                float[] levels = DS.GetData<float[]>("lev");
+                NLevels = levels.Length;
+            }
+            else
+            {
+                NLevels = 0;
+            }
+        }
+    }
+}
+
+public class MetFileSerial : MetFile
+{
+    private string CurrentFileTemplate;
+    public MetFileSerial(string fileTemplate, DateTime firstTime, double[] xLim, double[] yLim, int secondOffset = 0) :
+        base(fileTemplate, firstTime, xLim, yLim, secondOffset)
+    {
+        // Nothing additional to do
+    }
+
+    protected override void UpdateVar(IMetData metVar, bool readFile)
+    {
+        metVar.Update(string.Format(CurrentFileTemplate,metVar.GetName()),TimeIndex,readFile);
+    }
+
+    private void FillCurrentTemplate(DateTime targetTime)
+    {
+        // Updates the file template so that the full path to the file for a given variable can be easily generated
+        CurrentFileTemplate = string.Format(FileTemplate, targetTime.Year, targetTime.Month, targetTime.Day, "{0}");
+    }
+
+    private string VariableFilePath(string varName)
+    {
+        return string.Format(CurrentFileTemplate, varName);
+    }
+    
+    public override void OpenFile(DateTime targetTime, bool firstRead)
+    {
+        FillCurrentTemplate(targetTime);
+        
+        // Parse the time data
+        string fileName = VariableFilePath("TIME");
+        DateTime[] timeVec = NetcdfSerializer.DeserializeTime(fileName);
+        int nTimes = timeVec.Length;
+        TimeVec = new DateTime[nTimes + 1];
+        for (int i = 0; i < nTimes; i++)
+        {
+            TimeVec[i+1] = timeVec[i] + TimeSpan.FromSeconds(SecondOffset);
+        }
+        TimeVec[0] = TimeVec[1] - (timeVec[1] - timeVec[0]);
+        if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
+        {
+            // Set up the domain too
+            float[] latMids = NetcdfSerializer.Deserialize1DNoTime(VariableFilePath("LAT1D"));
+            float[] lonMids = NetcdfSerializer.Deserialize1DNoTime(VariableFilePath("LON1D"));
+            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
+            // WARNING: This is hard coded for now because the files we are reading do not contain the necessary information
+            // TODO: Merge LON1D, LAT1D, TIME and number of levels into a DIMENSIONS file
+            NLevels = 72;
+        }
+    }
 }

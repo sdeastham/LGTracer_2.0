@@ -9,8 +9,9 @@ namespace LGTracer;
 
 public interface IMetData
 {
-    void Update<T>(T dataSource);
+    void Update<T>(T dataSource, int timeIndex, bool readFile);
     void SetTimeFraction(double timeFraction);
+    string GetName();
 }
 public abstract class MetData<T> : IMetData
 {
@@ -21,9 +22,10 @@ public abstract class MetData<T> : IMetData
     protected T[] FullData { get; set; }
 
     public abstract T CurrentData { get; protected set; }
-    public T NextData => FullData[TimeIndex%TimesPerFile];
-    public T PreviousData => FullData[(TimeIndex-1)%TimesPerFile];
+    public T NextData => FullData[TimeIndex];
+    public T PreviousData => FullData[TimeIndex-1];
 
+    // TimeIndex is the RIGHT BRACKET
     protected int TimeIndex; // What was the last time index in FullData used to set NextData?
     protected int TimesPerFile; // How many times in each file?
 
@@ -53,7 +55,8 @@ public abstract class MetData<T> : IMetData
 
     protected bool SerializedData;
     protected int Rank;
-    
+
+    private bool Initialized;
 
     protected MetData(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0, bool serializedData=false)
     {
@@ -77,19 +80,31 @@ public abstract class MetData<T> : IMetData
         // entry 1 to N will be the entries from the current file read. Since TimeIndex refers to the
         // entry in FullData relevant to NextData, it gets reset to 1 each time a new file is read in.
         // If TimeIndex hits N+1, a new read operation is required.
-        TimeIndex = TimesPerFile; // Forces read on next update
+        TimeIndex = 0; // Will be overwritten
+
+        // Indicate that the first update needs to fill the data arrays
+        Initialized = false;
         
         // Will we use netCDF data or serialized?
         SerializedData = serializedData;
         Rank = 0;
     }
 
-    public void Update<T2>(T2 dataSource)
+    public string GetName()
     {
-        if (TimeIndex >= TimesPerFile)
+        return FieldName;
+    }
+
+    public void Update<T2>(T2 dataSource, int timeIndex, bool readFile)
+    {
+        // Structure changed to be top-down
+        TimeIndex = timeIndex;
+        if (Initialized)
         {
-            TimeIndex = 1;
             ShuffleLastToFirst();
+        }
+        if (readFile || !Initialized)
+        {
             switch (dataSource)
             {
                 case DataSet:
@@ -101,11 +116,9 @@ public abstract class MetData<T> : IMetData
                 default:
                     throw new ArgumentException("Unrecognized data type for met update.");
             }
+            //Console.WriteLine($"VARIABLE {GetName()} NEW READ-IN COMPLETE");
         }
-        else
-        {
-            TimeIndex++;
-        }
+        Initialized = true;
     }
 
     public virtual void SetTimeFraction(double timeFraction)
@@ -120,7 +133,7 @@ public abstract class MetData2D : MetData<double[,]>
     {
         Rank = 2;
         FullData = new double[TimesPerFile+1][,];
-        for (int i=0; i<=TimesPerFile; i++)
+        for (int i=0; i<(TimesPerFile+1); i++)
         {
             FullData[i] = new double[NY,NX];
         }
@@ -173,7 +186,7 @@ public abstract class MetData3D : MetData<double[,,]>
     {
         NZ = nLevels;
         FullData = new double[TimesPerFile+1][,,];
-        for (int i=0; i<=TimesPerFile; i++)
+        for (int i=0; i<(TimesPerFile+1); i++)
         {
             FullData[i] = new double[NZ,NY,NX];
         }
