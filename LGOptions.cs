@@ -96,4 +96,5 @@ public class LGOptionsIO
     public string MetDirectory = "";
     public string OutputDirectory = "";
     public string InputDirectory = "";
+    public bool SerialMetData = false;
 }

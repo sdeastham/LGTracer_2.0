@@ -56,7 +56,8 @@ public class Program
         bool boxHeightsNeeded = configOptions.PointsFlights is { Active: true, ComplexContrails: true };
 
         // Set up the meteorology and domain
-        MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate, subwatches);
+        MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate, 
+            configOptions.InputOutput.SerialMetData, subwatches);
         (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
         DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP,
             meteorology, subwatches, boxHeightsNeeded);

@@ -26,7 +26,7 @@ public class MetManager
 
     private Dictionary<string, Stopwatch> Stopwatches;
         
-    public MetManager(string metDir, double[] lonLims, double[] latLims, DateTime startDate, Dictionary<string, Stopwatch> stopwatches)
+    public MetManager(string metDir, double[] lonLims, double[] latLims, DateTime startDate, bool useSerial, Dictionary<string, Stopwatch> stopwatches)
     {
         MetFiles = [];
         Stopwatches = stopwatches;
@@ -48,7 +48,6 @@ public class MetManager
         
         MetFile currentFile;
         string currentTemplate;
-        bool useSerial = true;
 
         // 3-hour instantaneous
         if (useSerial)
