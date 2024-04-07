@@ -240,7 +240,7 @@ public abstract class MetFile : IMetFile
         return timeVec;
     }
 
-    protected static (double [], double[], int[], int[] ) ParseLatLon( float[] lonMids, float[] latMids, double[] lonLims, double[] latLims )
+    protected static (double [], double[], int[], int[] ) ParseLatLon( float[]? lonMids, float[]? latMids, double[] lonLims, double[] latLims )
     {
         Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
         double[] lonEdge,latEdge;
@@ -330,8 +330,8 @@ public class MetFileNetCDF : MetFile
         if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
         {
             // Set up the domain too
-            float[] latMids = DS.GetData<float[]>("lat");
-            float[] lonMids = DS.GetData<float[]>("lon");
+            float[]? latMids = DS.GetData<float[]>("lat");
+            float[]? lonMids = DS.GetData<float[]>("lon");
             (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
             if (DS.Variables.Contains("lev"))
             {
@@ -374,7 +374,23 @@ public class MetFileSerial : MetFile
     public override void OpenFile(DateTime targetTime, bool firstRead)
     {
         FillCurrentTemplate(targetTime);
-        
+        string fileName = VariableFilePath("DIMENSIONS");
+        (DateTime[]? timeVec, int? nLevels, float[]? latMids, float[]? lonMids, bool[] dimsFound) =
+            NetcdfSerializer.DeserializeDimensions(fileName);
+        int nTimes = timeVec?.Length ?? 1;
+        TimeVec = new DateTime[nTimes + 1];
+        for (int i = 0; i < nTimes; i++)
+        {
+            TimeVec[i+1] = timeVec[i] + TimeSpan.FromSeconds(SecondOffset);
+        }
+        TimeVec[0] = TimeVec[1] - (timeVec[1] - timeVec[0]);
+        if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
+        {
+            // Set up the domain too
+            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
+            NLevels = nLevels ?? 1;
+        }
+        /*
         // Parse the time data
         string fileName = VariableFilePath("TIME");
         DateTime[] timeVec = NetcdfSerializer.DeserializeTime(fileName);
@@ -395,5 +411,6 @@ public class MetFileSerial : MetFile
             // TODO: Merge LON1D, LAT1D, TIME and number of levels into a DIMENSIONS file
             NLevels = 72;
         }
+        */
     }
 }
