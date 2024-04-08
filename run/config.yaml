@@ -13,16 +13,17 @@
     initial: 1500
     # Calculate delta T due to pressure change?
     adiabatic-compression: true
-    kg-per-point: 2.0e14
+    kg-per-point: 2.0e13
     output-filename: dense-points.nc
     output-variables: [ "temperature",
                         "relative_humidity_ice",
                         "relative_humidity_liquid",
                         "specific_humidity"]
  points-flights:
-    schedule-filename: "schedule.csv"
-    airports-filename: "airports.csv"
+    schedule-filename: "schedule_large_random.csv"
+    airports-filename: "airports_large.csv"
     segments-filename: null
+    use-icao: true
     max: null
     adiabatic-compression: true
     output-filename: flight-waypoints.nc
@@ -42,6 +43,7 @@
     include-settling: true
     # Complex contrails incur more computational cost
     complex-contrails: false
+    point-spacing: 300.0
  domain:
    east-limit: -80.0
    west-limit: 15.0

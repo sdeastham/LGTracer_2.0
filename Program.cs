@@ -132,7 +132,7 @@ public class Program
                 includeSettling: configOptions.PointsFlights.IncludeSettling,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                 propertyNames: configOptions.PointsFlights.OutputVariables,
-                verboseOutput: configOptions.Verbose);
+                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao);
 
             if (configOptions.PointsFlights.ScheduleFilename != null)
             {

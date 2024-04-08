@@ -77,6 +77,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public bool ContrailSimulation = false;
     public bool IncludeSettling = false;
     public bool ComplexContrails = false;
+    public bool UseIcao = true;
 }
 
 public class LGOptionsDomain

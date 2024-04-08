@@ -12,13 +12,13 @@ public class PointManagerFlight : PointManager
     protected double PointPeriod;
     public string SegmentsOutputFilename { get; protected set; }
     public bool ContrailSimulation { get; private set; }
-
     private bool IncludeSettling;
+    private string AirportNameField;
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
         bool verboseOutput = false, bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
-        bool contrailSimulation = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
+        bool contrailSimulation = false, bool useIcao = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
         propertyNames)
     {
         LastSeedTime = initialSeedTime;
@@ -34,6 +34,14 @@ public class PointManagerFlight : PointManager
             throw new InvalidOperationException("Failed contrail test suite!");
         }
         */
+        if (useIcao)
+        {
+            AirportNameField = "ICAO";
+        }
+        else
+        {
+            AirportNameField = "IATA";
+        }
     }
 
     protected override IAdvected CreatePoint()
@@ -255,11 +263,12 @@ public override void Seed(double dt)
             int iataIndex = Array.IndexOf(colNames, "IATA name");
             int latIndex = Array.IndexOf(colNames, "Latitude");
             int lonIndex = Array.IndexOf(colNames, "Longitude");
+            int nameIndex = Array.IndexOf(colNames, $"{AirportNameField} name");
 
             while (!csvParser.EndOfData)
             {
                 string[] fields = csvParser.ReadFields();
-                string airportName = fields[iataIndex]; // Use IATA for now
+                string airportName = fields[nameIndex];
                 airports.Add(airportName, new Airport(double.Parse(fields[lonIndex]),
                     double.Parse(fields[latIndex]), fields[iataIndex], fields[icaoIndex]));
             }
