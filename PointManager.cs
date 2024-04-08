@@ -231,7 +231,7 @@ public abstract class PointManager
             // Multiple possible reasons for invalidity
             // CheckValid is designed to see if the point is invalid for physics reasons (e.g. it is too diffuse to
             // track) whereas the domain checks are universal
-            if ((!point.CheckValid()) || x < Domain.XMin || x >= Domain.XMax || y < Domain.YMin || y >= Domain.YMax || p > Domain.PBase || p < Domain.PCeiling )
+            if (!(point.CheckValid() && Domain.InDomainXYP(x,y,p)))
             {
                 DeactivatePoint(node);
             }

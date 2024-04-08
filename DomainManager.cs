@@ -375,13 +375,19 @@ public class DomainManager
         return valueArray[yIndex,xIndex];
     }
 
+    public (int, int) GetXYIndex(double x, double y)
+    {
+        int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DX)),NX-1);
+        int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - YMin)/DY)),NY-1);
+        return (xIndex, yIndex);
+    }
+    
     public double NearestNeighbor3D( double x, double y, double pressure, double[,,] valueArray)
     {
         // Ignore pressure for now
         // Extract the velocity vector from an array
         // Assumes constant X spacing and constant Y spacing
-        int xIndex = Math.Min(Math.Max(0,(int)Math.Floor((x - XMin)/DX)),NX-1);
-        int yIndex = Math.Min(Math.Max(0,(int)Math.Floor((y - YMin)/DY)),NY-1);
+        (int xIndex, int yIndex) = GetXYIndex(x, y);
         // Need to search through the pressure edges at this location
         double ps = SurfacePressureXY[yIndex,xIndex];
         int pIndex = 0;
@@ -786,5 +792,15 @@ public class DomainManager
                 }
             }
         }
+    }
+
+    public bool InDomainXY(double x, double y)
+    {
+        return (x >= XMin && x <= XMax && y >= YMin && y <= YMax);
+    }
+
+    public bool InDomainXYP(double x, double y, double p)
+    {
+        return InDomainXY(x, y) && p >= PCeiling && p < PBase;
     }
 }
