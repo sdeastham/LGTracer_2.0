@@ -1,64 +1,64 @@
 ﻿---
- timing:
-   start-date: "2023-01-01 00:00:00"
-   end-date: "2023-01-05 00:00:00"
- timesteps:
-   # Simulation heartbeat (seconds)
-   simulation: 300.0
-   # Diagnostic and output (minutes)
-   reporting: 180.0
-   storage: 5.0
- points-dense:
-    max: 0
-    initial: 1500
-    # Calculate delta T due to pressure change?
-    adiabatic-compression: true
-    kg-per-point: 2.0e13
-    output-filename: dense-points.nc
-    output-variables: [ "temperature",
-                        "relative_humidity_ice",
-                        "relative_humidity_liquid",
-                        "specific_humidity"]
- points-flights:
-    schedule-filename: "schedule_large_random.csv"
-    airports-filename: "airports_large.csv"
-    segments-filename: null
-    use-icao: true
-    max: null
-    adiabatic-compression: true
-    output-filename: flight-waypoints.nc
-    # Not currently used
-    segments-output-filename: flight-segments.nc
-    output-variables: ["segment_length",
-                       "segment_stretch",
-                       "segment_tail_x",
-                       "segment_tail_y",
-                       "segment_tail_p",
-                       "contrail_ice_mass",
-                       "contrail_settling_velocity",
-                       "contrail_crystal_radius",
-                       "contrail_cross_section_area"]
-    # Contrail options
-    contrail-simulation: true
-    include-settling: true
-    # Complex contrails incur more computational cost
-    complex-contrails: false
-    point-spacing: 300.0
- domain:
-   east-limit: -80.0
-   west-limit: 15.0
-   south-limit: 10.0
-   north-limit: 60.0
-   pressure-base: 850.0
-   pressure-ceiling: 200.0
- input-output:
-   met-directory: "C:/Data/MERRA-2"
-   output-directory: "C:/Data/LGTracer/output"
-   input-directory: "C:/Data/LGTracer/input"
-   serial-met-data: true
- # Use null for the default (system clock)
- seed: 481301
- # Update meteorology over time?
- time-dependent-meteorology: true
- # More verbose output?
- verbose: true
+timing:
+  start-date: "2023-01-01 00:00:00"
+  end-date: "2023-01-03 00:00:00"
+timesteps:
+  # Simulation heartbeat (seconds)
+  simulation: 300.0
+  # Diagnostic and output (minutes)
+  reporting: 180.0
+  storage: 5.0
+points-dense:
+  max: 0
+  initial: 1500
+  # Calculate delta T due to pressure change?
+  adiabatic-compression: true
+  kg-per-point: 2.0e13
+  output-filename: dense-points.nc
+  output-variables: [ "temperature",
+                      "relative_humidity_ice",
+                      "relative_humidity_liquid",
+                      "specific_humidity"]
+points-flights:
+  schedule-filename: "schedule_large_random.csv"
+  airports-filename: "airports_large.csv"
+  segments-filename: null
+  use-icao: true
+  max: null
+  adiabatic-compression: true
+  output-filename: flight-waypoints.nc
+  # Not currently used
+  segments-output-filename: flight-segments.nc
+  output-variables: ["segment_length",
+                     "segment_stretch",
+                     "segment_tail_x",
+                     "segment_tail_y",
+                     "segment_tail_p",
+                     "contrail_ice_mass",
+                     "contrail_settling_velocity",
+                     "contrail_crystal_radius",
+                     "contrail_cross_section_area"]
+  # Contrail options
+  contrail-simulation: true
+  include-settling: true
+  # Complex contrails incur more computational cost
+  complex-contrails: false
+  point-spacing: 300.0
+domain:
+  east-limit: -80.0
+  west-limit: 15.0
+  south-limit: 10.0
+  north-limit: 60.0
+  pressure-base: 850.0
+  pressure-ceiling: 200.0
+input-output:
+  met-directory: "C:/Data/MERRA-2"
+  output-directory: "C:/Data/LGTracer/output"
+  input-directory: "C:/Data/LGTracer/input"
+  serial-met-data: true
+# Use null for the default (system clock)
+seed: 481301
+# Update meteorology over time?
+time-dependent-meteorology: true
+# More verbose output?
+verbose: true
