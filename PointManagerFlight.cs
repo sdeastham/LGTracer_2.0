@@ -117,9 +117,14 @@ public class PointManagerFlight : PointManager
             throw new ArgumentException($"Flight label {flightLabelSafe} duplicated");
         }
         
+        // Store the flight data
+        Flight flight = new Flight(dateTimes,lons,lats,pressureAltitudes,pointPeriod,flightLabelSafe,LastSeedTime,equipment);
+        
         // Assume that the flight date times are in order
-        FlightTable.Add(flightLabelSafe, new Flight(dateTimes[0]));
+        FlightTable.Add(flightLabelSafe, flight);
 
+        // Don't actually run this yet!
+        /*
         for (int i = 0; i < nSegments; i++)
         {
             double gcd = Geodesy.GreatCircleDistance(lons[i], lats[i], lons[i + 1], lats[i + 1]);
@@ -130,10 +135,12 @@ public class PointManagerFlight : PointManager
                 0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod,
                 flightLabelSafe, equipment);
         }
+        */
         
         // If you want to be very safe, you can run FlightTable[flightLabelSafe].SetTakeoff()
     }
 
+    /*
     public void AddFlightSegmentOrdered(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
         double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
@@ -146,7 +153,9 @@ public class PointManagerFlight : PointManager
         AddFlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
             endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, equipment);
     }
+    */
 
+    /*
     public void AddFlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
         double endLatitude, double endLongitude, DateTime endDateTime,
         double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
@@ -172,6 +181,7 @@ public class PointManagerFlight : PointManager
 
         FlightTable[flightLabel].SegmentList.AddLast(seg);
     }
+    */
 
     public override IAdvected NextPoint(double x, double y, double pressure)
     {
@@ -190,6 +200,10 @@ public override void Seed(double dt)
         {
             Flight flight = FlightTable[flightLabel];
             if (flight.Takeoff > endTime) { continue; }
+            if (!flight.SegmentsReady)
+            {
+                flight.PrepSegments(endTime);
+            }
             int nWaypointsLeft = 0;
             // For each flight segment, check if there are any new seeds which should be created
             foreach (FlightSegment flightSegment in flight.SegmentList)
@@ -230,7 +244,7 @@ public override void Seed(double dt)
                 node = nextNode;
             }
             // If no segments left, delete the flight from the table
-            if (flight.SegmentList.First == null)
+            if (flight is { SegmentsReady: true, SegmentList.First: null })
             {
                 FlightTable.Remove(flightLabel);
             }
@@ -364,21 +378,59 @@ public override void Seed(double dt)
         public string NameICAO = nameICAO;
         public double Elevation = elevation;
     }
-    protected class Flight(DateTime? takeoff = null)
+    protected class Flight
     {
-        public LinkedList<FlightSegment> SegmentList = [];
+        public LinkedList<FlightSegment> SegmentList;
         public LGPointConnected? LastPoint { get; protected set; } = null;
-        public DateTime? Takeoff = takeoff;
+        public DateTime Takeoff => WaypointTimes[0];
+        public bool SegmentsReady;
+        
+        // Waypoint data
+        private double[] WaypointLons;
+        private double[] WaypointLats;
+        private double[] WaypointAltitudes;
+        private DateTime[] WaypointTimes;
+        private string FlightLabel;
+        private IAircraft? Equipment;
+        private double PointPeriod;
 
-        public void SetTakeoff()
+        public Flight(DateTime[] waypointTimes, double[] lons, double[] lats, double[] pressureAltitudes,
+            double pointPeriod, string flightLabel, DateTime cullTime, IAircraft? equipment)
         {
-            foreach (FlightSegment segment in SegmentList)
+            WaypointTimes = waypointTimes;
+            WaypointLons = lons;
+            WaypointLats = lats;
+            WaypointAltitudes = pressureAltitudes;
+            Equipment = equipment;
+            FlightLabel = flightLabel;
+            PointPeriod = pointPeriod;
+            SegmentsReady = false;
+            SegmentList = [];
+        }
+
+        public void PrepSegments(DateTime currentTime)
+        {
+            if (currentTime < Takeoff)
             {
-                DateTime segmentTime = segment.StartDateTime;
-                if (Takeoff == null || segmentTime < Takeoff)
+                return;
+            }
+            int nSegments = WaypointLons.Length - 1;
+            for (int i = 0; i < nSegments; i++)
+            {
+                if (currentTime > WaypointTimes[i+1])
                 {
-                    Takeoff = (DateTime)segmentTime;
+                    continue;
                 }
+                double gcd = Geodesy.GreatCircleDistance(WaypointLons[i], WaypointLats[i], WaypointLons[i + 1], WaypointLats[i + 1]);
+                double segmentDuration = (WaypointTimes[i + 1] - WaypointTimes[i]).TotalSeconds;
+                double flightSpeed = 3600.0 * gcd / segmentDuration;
+                FlightSegment seg = new FlightSegment(WaypointLats[i], WaypointLons[i], WaypointTimes[i],
+                    WaypointLats[i + 1], WaypointLons[i + 1], WaypointTimes[i + 1],
+                    0.5 * (WaypointAltitudes[i] + WaypointAltitudes[i + 1]), flightSpeed, PointPeriod,
+                    FlightLabel, Equipment);
+                // No need to cull - already skipped segments which finished before this time
+                SegmentList.AddLast(seg);
+                SegmentsReady = true;
             }
         }
         
