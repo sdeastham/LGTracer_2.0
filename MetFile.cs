@@ -159,11 +159,11 @@ public abstract class MetFile : IMetFile
         // Track whether we need to update - this is important because in theory
         // we could end up with the same time index
         Stopwatches["Met advance"].Start();
-        bool readFile = false;
-        while (newTime > TimeVec[TimeIndex]) // While the current time is AFTER the right bracket..
+        bool readFile = TimeIndex == 0;
+        while (newTime >= TimeVec[TimeIndex]) // While the current time is AFTER the right bracket..
         {
             TimeIndex++;
-            // If the time index now points to the final time in the vector, then we need to update the underlying
+            // If the time index now points past the final time in the vector, then we need to update the underlying
             // date structure
             if (TimeIndex >= TimeVec.Length)
             {
