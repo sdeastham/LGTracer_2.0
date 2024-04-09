@@ -16,10 +16,13 @@ public class LGPointConnected(
     private LGPointConnected? Previous;
     private LGPointConnected? Next;
     protected LGSegment? Segment;
+    protected Action<LGPointConnected>? Cleanup;
 
-    public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN")
+    public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN", Action<LGPointConnected>? cleanup=null)
     {
         Previous = predecessor;
+        // Action to call on death
+        Cleanup = cleanup;
         if (Previous == null) { return; }
         Previous.Next = this;
         // Cannot create a segment if the previous point is inactive
@@ -47,6 +50,7 @@ public class LGPointConnected(
             // We don't want to just stitch these together - with the death of this point the chain is broken
             Next.Previous = null;
         }
+        Cleanup?.Invoke(this);
         base.Deactivate();
     }
 

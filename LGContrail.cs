@@ -60,6 +60,7 @@ public class LGContrail : LGPointConnected
     private (double, double, double) VelocityCalcWithSettling(double x, double y, double pressure)
     {
         (double dxdt, double dydt, double dpdt) = VelocityCalcNoSettling(x, y, pressure);
+        if (!ContrailLive()) { return (dxdt,dydt,dpdt); }
         // Calculate settling velocity in m/s
         double dzdtSettling = CalculateSettlingVelocity(CrystalRadius, CalculateDynamicViscosity(Temperature));
         // Store for diagnostics
@@ -363,7 +364,7 @@ public class LGContrail : LGPointConnected
     {
         if (!Active) return;
         double oldPressure = Pressure;
-        bool contrailActive = (Segment != null) && CheckValid();
+        bool contrailActive = (Segment != null) && ContrailLive();
         double oldLength = 1.0;
         double oldTemperature = 1.0;
         double oldIceMass = IceMass;
@@ -423,7 +424,7 @@ public class LGContrail : LGPointConnected
         // TODO: Incorporate ice crystal microphysics
     }
 
-    public override bool CheckValid()
+    public bool ContrailLive()
     {
         return CrystalCount > 1.0e-10 || !double.IsNaN(CrossSectionArea);
     }

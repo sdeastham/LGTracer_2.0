@@ -122,66 +122,7 @@ public class PointManagerFlight : PointManager
         
         // Assume that the flight date times are in order
         FlightTable.Add(flightLabelSafe, flight);
-
-        // Don't actually run this yet!
-        /*
-        for (int i = 0; i < nSegments; i++)
-        {
-            double gcd = Geodesy.GreatCircleDistance(lons[i], lats[i], lons[i + 1], lats[i + 1]);
-            double segmentDuration = (dateTimes[i + 1] - dateTimes[i]).TotalSeconds;
-            double flightSpeed = 3600.0 * gcd / segmentDuration;
-            AddFlightSegmentOrdered(lats[i], lons[i], dateTimes[i],
-                lats[i + 1], lons[i + 1], dateTimes[i + 1],
-                0.5 * (pressureAltitudes[i] + pressureAltitudes[i + 1]), flightSpeed, pointPeriod,
-                flightLabelSafe, equipment);
-        }
-        */
-        
-        // If you want to be very safe, you can run FlightTable[flightLabelSafe].SetTakeoff()
     }
-
-    /*
-    public void AddFlightSegmentOrdered(double startLatitude, double startLongitude, DateTime startDateTime,
-        double endLatitude, double endLongitude, DateTime endDateTime,
-        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
-        IAircraft? equipment = null)
-    {
-        // Convenience function - as long as flights are being added in full and their segments are added in order,
-        // this will ensure that they are linked together
-        Flight flight = FlightTable[flightLabel];
-        LinkedListNode<FlightSegment>? node = flight.SegmentList.Last;
-        AddFlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
-            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, equipment);
-    }
-    */
-
-    /*
-    public void AddFlightSegment(double startLatitude, double startLongitude, DateTime startDateTime,
-        double endLatitude, double endLongitude, DateTime endDateTime,
-        double cruisePressureAltitude, double flightSpeed, double pointPeriod, string flightLabel,
-        IAircraft? equipment = null)
-    {
-        // Define a new flight segment, to take place at constant cruise pressure altitude and flight speed
-        // Units:
-        // * start/end latitude         Degrees North
-        // * start/end longitude        Degrees East
-        // * start/end date time        C# date time objects
-        // * altitude                   Kilometers, explicitly representing a pressure altitude
-        // * pointPeriod                Seconds between production of a new point
-        // The first point will be produced in the first timestep which contains the start time
-        FlightSegment seg = new FlightSegment(startLatitude, startLongitude, startDateTime, endLatitude, endLongitude,
-            endDateTime, cruisePressureAltitude, flightSpeed, pointPeriod, flightLabel, equipment);
-        // Remove any waypoints which would already have been deployed
-        seg.CullByDatetime(LastSeedTime);
-        // Add to the table of flights
-        if (!FlightTable.ContainsKey(flightLabel))
-        {
-            FlightTable.Add(flightLabel, new Flight());
-        }
-
-        FlightTable[flightLabel].SegmentList.AddLast(seg);
-    }
-    */
 
     public override IAdvected NextPoint(double x, double y, double pressure)
     {
@@ -193,7 +134,7 @@ public class PointManagerFlight : PointManager
         return point;
     }
 
-public override void Seed(double dt)
+    public override void Seed(double dt)
     {
         DateTime endTime = LastSeedTime + TimeSpan.FromSeconds(dt);
         foreach (string flightLabel in FlightTable.Keys)
@@ -202,7 +143,7 @@ public override void Seed(double dt)
             if (flight.Takeoff > endTime) { continue; }
             if (!flight.SegmentsReady)
             {
-                flight.PrepSegments(endTime);
+                flight.PrepSegments(LastSeedTime,endTime);
             }
             int nWaypointsLeft = 0;
             // For each flight segment, check if there are any new seeds which should be created
@@ -211,16 +152,19 @@ public override void Seed(double dt)
                 FlightSegment.Waypoint[] seedVector = flightSegment.DeploySeeds(LastSeedTime, endTime);
                 foreach (FlightSegment.Waypoint seed in seedVector)
                 {
+                    if (!Domain.InDomainXYP(seed.Lon, seed.Lat, seed.Pressure)) { continue; }
                     LGPointConnected newPoint = (LGPointConnected)NextPoint(seed.Lon, seed.Lat, seed.Pressure);
-                    newPoint.Connect(flight.LastPoint, null, flightLabel);
+                    newPoint.Connect(flight.LastPoint, null, flightLabel, flight.ClearPoint);
                     flight.UpdateLast(newPoint);
                 }
                 nWaypointsLeft += flightSegment.WaypointsRemaining;
             }
             // Don't need to keep this around if there are no waypoints left to seed
-            if (nWaypointsLeft == 0) { FlightTable.Remove(flightLabel); }
+            if (nWaypointsLeft == 0)
+            {
+                FlightTable.Remove(flightLabel);
+            }
         }
-
         LastSeedTime = endTime;
     }
 
@@ -342,12 +286,14 @@ public override void Seed(double dt)
                     // NB: First entry means Sunday
                     weekdays[i] = weekdaysString[i] ==  'T';
                 }
-                // Add flight each valid day
-                for (int iDay = 0; iDay < (endDate - startDate).TotalDays; iDay++)
+                // Add flight that takes off on each valid day
+                // Start from the day before, as we need to carry over flights which took off the previous day
+                DateTime? startCutoff = cullByStart ? simulationStart - TimeSpan.FromDays(1) : null;
+                for (int iDay = -1; iDay < (endDate - startDate).TotalDays; iDay++)
                 {
                     DateTime currentDate = startDate + TimeSpan.FromDays(iDay);
                     if (!weekdays[(int)currentDate.DayOfWeek]) { continue; }
-                    if ((cullByStart && currentDate < simulationStart) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
+                    if ((cullByStart && currentDate < startCutoff) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
                     SimulateFlight(originAirport.Longitude, originAirport.Latitude,
                         destinationAirport.Longitude, destinationAirport.Latitude,
                         currentDate, 820.0, null, PointPeriod);
@@ -383,6 +329,7 @@ public override void Seed(double dt)
         public LinkedList<FlightSegment> SegmentList;
         public LGPointConnected? LastPoint { get; protected set; } = null;
         public DateTime Takeoff => WaypointTimes[0];
+        public DateTime Landing => WaypointTimes[^1];
         public bool SegmentsReady;
         
         // Waypoint data
@@ -408,16 +355,16 @@ public override void Seed(double dt)
             SegmentList = [];
         }
 
-        public void PrepSegments(DateTime currentTime)
+        public void PrepSegments(DateTime stepStart, DateTime stepEnd)
         {
-            if (currentTime < Takeoff)
+            if (stepEnd < Takeoff)
             {
                 return;
             }
             int nSegments = WaypointLons.Length - 1;
             for (int i = 0; i < nSegments; i++)
             {
-                if (currentTime > WaypointTimes[i+1])
+                if (stepStart > WaypointTimes[i+1] || stepEnd < WaypointTimes[i])
                 {
                     continue;
                 }
@@ -428,7 +375,8 @@ public override void Seed(double dt)
                     WaypointLats[i + 1], WaypointLons[i + 1], WaypointTimes[i + 1],
                     0.5 * (WaypointAltitudes[i] + WaypointAltitudes[i + 1]), flightSpeed, PointPeriod,
                     FlightLabel, Equipment);
-                // No need to cull - already skipped segments which finished before this time
+                // Cull waypoints in the segment that have no business existing
+                seg.CullByDatetime(stepStart);
                 SegmentList.AddLast(seg);
                 SegmentsReady = true;
             }
@@ -437,6 +385,14 @@ public override void Seed(double dt)
         public void UpdateLast(LGPointConnected newPoint)
         {
             LastPoint = newPoint;
+        }
+
+        public void ClearPoint(LGPointConnected caller)
+        {
+            if (caller == LastPoint)
+            {
+                LastPoint = null;
+            }
         }
     }
 }

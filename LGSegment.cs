@@ -52,6 +52,8 @@ public class LGSegment
     {
         Head = head;
         Tail = tail;
+        HeadUpdated = true;
+        TailUpdated = true;
         Stale = true;
         UpdateProperties();
         InitialSegmentLength = SegmentLength;
