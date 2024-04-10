@@ -14,13 +14,15 @@ public class PointManagerFlight : PointManager
     public bool ContrailSimulation { get; private set; }
     private bool IncludeSettling;
     private string AirportNameField;
+    protected Random? RandomNumberGenerator;
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
         bool verboseOutput = false, bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
-        bool contrailSimulation = false, bool useIcao = false) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
+        bool contrailSimulation = false, bool useIcao = false, Random? rng = null) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
         propertyNames)
     {
+        RandomNumberGenerator = rng;
         LastSeedTime = initialSeedTime;
         FlightTable = [];
         PointPeriod = pointPeriod;
@@ -61,7 +63,7 @@ public class PointManagerFlight : PointManager
         IAircraft? equipment = null)
     {
         // Crude flight simulation between two airports. Currently only handles cruise
-        double cruiseAltitude = 10.0; // km
+        double cruiseAltitude = RandomNumberGenerator == null ? 10.0 : 9.0 + RandomNumberGenerator.NextDouble() * (12.0 - 9.0);
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
         return AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],

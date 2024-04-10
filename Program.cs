@@ -122,6 +122,7 @@ public class Program
         // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
         if (configOptions.PointsFlights.Active)
         {
+            Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
             string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                 configOptions.PointsFlights.OutputFilename);
             // TODO: Just pass configOptions.PointsFlights to the point manager!
@@ -132,7 +133,7 @@ public class Program
                 includeSettling: configOptions.PointsFlights.IncludeSettling,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
                 propertyNames: configOptions.PointsFlights.OutputVariables,
-                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao);
+                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao, rng: pmRNG);
 
             if (configOptions.PointsFlights.ScheduleFilename != null)
             {
