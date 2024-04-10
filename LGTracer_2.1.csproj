@@ -21,7 +21,6 @@
   <ItemGroup>
     <Reference Include="SerializeNC">
       <HintPath>..\SerializeNC\bin\net8.0\win-x64\SerializeNC.dll</HintPath>
-      <HintPath>../NetcdfSerializer/bin/Debug/net8.0\SerializeNC.dll</HintPath>
     </Reference>
   </ItemGroup>
 
