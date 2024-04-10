@@ -13,24 +13,34 @@ public class LGPointConnected(
      - Each is associated with a predecessor point (if one exists)
      - When an LGPoint has a predecessor, it will also have a "segment" associated [splitting?]
     */
-    private LGPointConnected? Previous;
-    private LGPointConnected? Next;
+    protected LGPointConnected? Previous;
+    protected LGPointConnected? Next;
     protected LGSegment? Segment;
+    // Cleanup allows callbacks - it will be called with this point as an argument when the point is deactivated
     protected Action<LGPointConnected>? Cleanup;
+    // Indicates whether this was the most recently created point in its chain
+    protected bool IsLeader = false;
 
     public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN", Action<LGPointConnected>? cleanup=null)
     {
         Previous = predecessor;
         // Action to call on death
         Cleanup = cleanup;
+        // Indicate that this is the most recently-created point
+        IsLeader = true;
         if (Previous == null) { return; }
+        // Update the previous connected point
         Previous.Next = this;
         // Cannot create a segment if the previous point is inactive
-        if (Previous.Active)
-        {
-            // Use the point ID if no segment ID is given
-            CreateSegment(segmentID ?? this.UID, segmentSource);
-        }
+        if (!Previous.Active) return;
+        // Use the point ID if no segment ID is given
+        CreateSegment(segmentID ?? this.UID, segmentSource);
+        Previous.IsLeader = false;
+    }
+
+    public void MakeFollower()
+    {
+        IsLeader = false;
     }
 
     public override void Deactivate()
@@ -90,5 +100,10 @@ public class LGPointConnected(
             return double.NaN;
         }
         return Segment.GetProperty(property.Substring(7));
+    }
+
+    public bool HasNeighbours()
+    {
+        return IsLeader || !(Next is not { Active: true } || Previous is not { Active: true });
     }
 }

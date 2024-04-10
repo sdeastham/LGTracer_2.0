@@ -56,7 +56,7 @@ public class PointManagerFlight : PointManager
         }
     }
 
-    public void SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
+    public bool SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
         DateTime takeoffTime, double cruiseSpeedKPH, string? flightLabel = null, double pointPeriod = 60.0 * 5.0,
         IAircraft? equipment = null)
     {
@@ -64,8 +64,8 @@ public class PointManagerFlight : PointManager
         double cruiseAltitude = 10.0; // km
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
-        AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
-            [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod, equipment);
+        return AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
+               [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod, equipment);
     }
 
     public void PrintFlights()
@@ -87,7 +87,7 @@ public class PointManagerFlight : PointManager
         }
     }
 
-    public void AddFlight(double[] lons, double[] lats, double[] pressureAltitudes, DateTime[] dateTimes,
+    public bool AddFlight(double[] lons, double[] lats, double[] pressureAltitudes, DateTime[] dateTimes,
         string? flightLabel = null, double pointPeriod = 60.0 * 5.0, IAircraft? equipment = null)
     {
         /* Add a flight as a series of waypoints
@@ -114,7 +114,7 @@ public class PointManagerFlight : PointManager
         // Check that we don't already have this flight in the table
         if (FlightTable.ContainsKey(flightLabelSafe))
         {
-            throw new ArgumentException($"Flight label {flightLabelSafe} duplicated");
+            return false;
         }
         
         // Store the flight data
@@ -122,6 +122,7 @@ public class PointManagerFlight : PointManager
         
         // Assume that the flight date times are in order
         FlightTable.Add(flightLabelSafe, flight);
+        return true;
     }
 
     public override IAdvected NextPoint(double x, double y, double pressure)
@@ -162,6 +163,11 @@ public class PointManagerFlight : PointManager
             // Don't need to keep this around if there are no waypoints left to seed
             if (nWaypointsLeft == 0)
             {
+                // Tell the final seeded point that no more will follow
+                if (flight.LastPoint != null && flight.LastPoint.Active)
+                {
+                    flight.LastPoint.MakeFollower();
+                }
                 FlightTable.Remove(flightLabel);
             }
         }
@@ -294,10 +300,13 @@ public class PointManagerFlight : PointManager
                     DateTime currentDate = startDate + TimeSpan.FromDays(iDay);
                     if (!weekdays[(int)currentDate.DayOfWeek]) { continue; }
                     if ((cullByStart && currentDate < startCutoff) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
-                    SimulateFlight(originAirport.Longitude, originAirport.Latitude,
+                    bool flightOK = SimulateFlight(originAirport.Longitude, originAirport.Latitude,
                         destinationAirport.Longitude, destinationAirport.Latitude,
                         currentDate, 820.0, null, PointPeriod);
-                    nFlights++;
+                    if (flightOK)
+                    {
+                        nFlights++;
+                    }
                 }
             }
         }

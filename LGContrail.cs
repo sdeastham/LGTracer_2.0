@@ -356,6 +356,7 @@ public class LGContrail : LGPointConnected
 
     public override void Deactivate()
     {
+        IsLeader = false;
         ZeroContrail();
         base.Deactivate();
     }
@@ -427,6 +428,15 @@ public class LGContrail : LGPointConnected
     public bool ContrailLive()
     {
         return CrystalCount > 1.0e-10 || !double.IsNaN(CrossSectionArea);
+    }
+
+    public override bool CheckValid()
+    {
+        // Am I base valid? If not, cull!
+        // Am I the leader such that I might end up as the tail for a contrail?
+        // Do I have a contrail?
+        // If not; am I the tail of another contrail?
+        return base.CheckValid() && (IsLeader || ContrailLive() || (Next != null && ((LGContrail)Next).ContrailLive()));
     }
 
     public override double GetProperty(string property)
