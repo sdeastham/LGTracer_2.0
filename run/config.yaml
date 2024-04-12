@@ -1,7 +1,7 @@
 ﻿---
 timing:
   start-date: "2023-01-01 00:00:00"
-  end-date: "2023-01-03 00:00:00"
+  end-date: "2023-01-05 00:00:00"
 timesteps:
   # Simulation heartbeat (seconds)
   simulation: 300.0
@@ -20,7 +20,7 @@ points-dense:
                       "relative_humidity_liquid",
                       "specific_humidity"]
 points-flights:
-  schedule-filename: "schedule_large_random.csv"
+  schedule-filename: "schedule_large_ranged.csv"
   airports-filename: "airports_large.csv"
   segments-filename: null
   use-icao: true
