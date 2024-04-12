@@ -40,8 +40,8 @@ public class LGContrail : LGPointConnected
     
     public Func<double, double, double, (double, double, double)> VelocityCalcNoSettling { get; protected set; }
 
-    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression, bool includeSettling) :
-        base(vCalc)
+    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression, bool includeSettling, double minimumPointLifetime=0.0) :
+        base(vCalc, minimumPointLifetime)
     {
         // Override vCalc to allow for inclusion of a settling speed
         VelocityCalcNoSettling = vCalc;
@@ -55,6 +55,8 @@ public class LGContrail : LGPointConnected
         }
         IncludeCompression = includeCompression;
         ZeroContrail();
+        // Contrails are NOT valid by default
+        DefaultValidity = false;
     }
 
     private (double, double, double) VelocityCalcWithSettling(double x, double y, double pressure)
@@ -423,7 +425,7 @@ public class LGContrail : LGPointConnected
         CrystalRadius = Math.Cbrt(0.75 * availableIce / (Math.PI * CrystalCount));
         // TODO: Incorporate simple diffusion and mixing
         // TODO: Incorporate ice crystal microphysics
-    }
+    } 
 
     public bool ContrailLive()
     {
@@ -436,7 +438,7 @@ public class LGContrail : LGPointConnected
         // Am I the leader such that I might end up as the tail for a contrail?
         // Do I have a contrail?
         // If not; am I the tail of another contrail?
-        return base.CheckValid() && (IsLeader || ContrailLive() || (Next != null && ((LGContrail)Next).ContrailLive()));
+        return base.CheckValid() || (IsLeader || ContrailLive() || (Next != null && ((LGContrail)Next).ContrailLive()));
     }
 
     public override double GetProperty(string property)

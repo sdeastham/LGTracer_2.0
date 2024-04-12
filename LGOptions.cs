@@ -78,6 +78,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public bool IncludeSettling = false;
     public bool ComplexContrails = false;
     public bool UseIcao = true;
+    public double MinimumLifetime = 0.0;
 }
 
 public class LGOptionsDomain

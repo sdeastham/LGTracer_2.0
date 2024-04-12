@@ -3,7 +3,7 @@
 namespace LGTracer;
 
 public class LGPointConnected(
-    Func<double, double, double, (double, double, double)> vCalc)
+    Func<double, double, double, (double, double, double)> vCalc, double minimumPointLifetime=0.0)
     : LGPoint(vCalc)
 {
     /*
@@ -20,6 +20,8 @@ public class LGPointConnected(
     protected Action<LGPointConnected>? Cleanup;
     // Indicates whether this was the most recently created point in its chain
     protected bool IsLeader = false;
+    // How long before we let a point die even if it is no longer connecteD?
+    protected double MinimumPointLifetime = minimumPointLifetime;
 
     public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN", Action<LGPointConnected>? cleanup=null)
     {
@@ -105,5 +107,11 @@ public class LGPointConnected(
     public bool HasNeighbours()
     {
         return IsLeader || !(Next is not { Active: true } || Previous is not { Active: true });
+    }
+
+    public override bool CheckValid()
+    {
+        // Prevent point from being deactivated if it has not yet reached minimum lifetime
+        return (Age < MinimumPointLifetime) || base.CheckValid();
     }
 }

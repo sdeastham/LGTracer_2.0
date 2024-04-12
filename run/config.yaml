@@ -44,6 +44,8 @@ points-flights:
   # Complex contrails incur more computational cost
   complex-contrails: false
   point-spacing: 300.0
+  # To ensure ongoing location collection - in hours
+  minimum-lifetime: 3.0
 domain:
   east-limit: -80.0
   west-limit: 15.0

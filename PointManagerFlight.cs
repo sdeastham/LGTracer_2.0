@@ -15,12 +15,13 @@ public class PointManagerFlight : PointManager
     private bool IncludeSettling;
     private string AirportNameField;
     protected Random? RandomNumberGenerator;
+    protected double MinimumPointLifetime;
 
     public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
         double pointPeriod, string segmentsOutputFilename,
         bool verboseOutput = false, bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
-        bool contrailSimulation = false, bool useIcao = false, Random? rng = null) : base(maxPoints, domain, filename, verboseOutput, includeCompression,
-        propertyNames)
+        bool contrailSimulation = false, bool useIcao = false, Random? rng = null, double minimumLifetime=0.0) : base(
+        maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
     {
         RandomNumberGenerator = rng;
         LastSeedTime = initialSeedTime;
@@ -29,6 +30,7 @@ public class PointManagerFlight : PointManager
         SegmentsOutputFilename = segmentsOutputFilename;
         ContrailSimulation = contrailSimulation;
         IncludeSettling = includeSettling;
+        MinimumPointLifetime = minimumLifetime;
         // Run contrail test suite
         /*
         if (ContrailSimulation && !LGContrail.TestSAC(true))
@@ -36,25 +38,18 @@ public class PointManagerFlight : PointManager
             throw new InvalidOperationException("Failed contrail test suite!");
         }
         */
-        if (useIcao)
-        {
-            AirportNameField = "ICAO";
-        }
-        else
-        {
-            AirportNameField = "IATA";
-        }
+        AirportNameField = useIcao ? "ICAO" : "IATA";
     }
 
     protected override IAdvected CreatePoint()
     {
         if (ContrailSimulation)
         {
-            return new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling);
+            return new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling, MinimumPointLifetime);
         }
         else
         {
-            return new LGPointConnected(VelocityCalc);
+            return new LGPointConnected(VelocityCalc, MinimumPointLifetime);
         }
     }
 
