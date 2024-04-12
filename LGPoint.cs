@@ -56,12 +56,15 @@ public class LGPoint : IAdvected
         return UID;
     }
 
+    protected bool DefaultValidity;
+
     public LGPoint( Func<double, double, double, (double, double, double)> vCalc)
     {
         // Point starts inactive
         _location = new Vector3(float.NaN,float.NaN,float.NaN);
         InitialLocation = new Vector3(float.NaN,float.NaN,float.NaN);
         VelocityCalc = vCalc;
+        DefaultValidity = true;
         // Set the rest of the properties by deactivating the point
         Deactivate();
     }
@@ -114,6 +117,6 @@ public class LGPoint : IAdvected
 
     public virtual bool CheckValid()
     {
-        return true;
+        return DefaultValidity;
     }
 }
