@@ -10,27 +10,39 @@ public class PointManagerFlight : PointManager
     protected DateTime LastSeedTime;
     protected Dictionary<string, Flight> FlightTable;
     protected double PointPeriod;
-    public string SegmentsOutputFilename { get; protected set; }
     public bool ContrailSimulation { get; private set; }
     private bool IncludeSettling;
     private string AirportNameField;
     protected Random? RandomNumberGenerator;
     protected double MinimumPointLifetime;
 
-    public PointManagerFlight(long? maxPoints, DomainManager domain, string outputDirectory, string filename,
-        DateTime initialSeedTime, double pointPeriod, string segmentsOutputFilename, bool verboseOutput = false,
-        bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
-        bool contrailSimulation = false, bool useIcao = false, Random? rng = null, double minimumLifetime=0.0) : base(
-        maxPoints, domain, outputDirectory, filename, initialSeedTime, verboseOutput, includeCompression, propertyNames)
+    /*
+     Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
+            string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
+                configOptions.PointsFlights.OutputFilename);
+            // TODO: Just pass configOptions.PointsFlights to the point manager!
+            double pointPeriod = configOptions.PointsFlights.PointSpacing;
+            PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
+                configOptions.InputOutput.OutputDirectory,configOptions.PointsFlights.OutputFilename,
+                startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
+                contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
+                includeSettling: configOptions.PointsFlights.IncludeSettling,
+                includeCompression: configOptions.PointsFlights.AdiabaticCompression,
+                propertyNames: configOptions.PointsFlights.OutputVariables,
+                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao, rng: pmRNG,
+                minimumLifetime: configOptions.PointsFlights.MinimumLifetime * 3600.0);
+     */
+    
+    public PointManagerFlight( DomainManager domain, LGOptions configOptions, LGOptionsPointsFlights configSubOptions, Random rng ) : base(
+        domain, configOptions, configSubOptions )
     {
         RandomNumberGenerator = rng;
-        LastSeedTime = initialSeedTime;
+        LastSeedTime = configOptions.Timing.StartDate;
         FlightTable = [];
-        PointPeriod = pointPeriod;
-        SegmentsOutputFilename = segmentsOutputFilename;
-        ContrailSimulation = contrailSimulation;
-        IncludeSettling = includeSettling;
-        MinimumPointLifetime = minimumLifetime;
+        PointPeriod = configSubOptions.PointSpacing;
+        ContrailSimulation = configSubOptions.ContrailSimulation;
+        IncludeSettling = configSubOptions.IncludeSettling;
+        MinimumPointLifetime = configSubOptions.MinimumLifetime;
         // Run contrail test suite
         /*
         if (ContrailSimulation && !LGContrail.TestSAC(true))
@@ -38,7 +50,7 @@ public class PointManagerFlight : PointManager
             throw new InvalidOperationException("Failed contrail test suite!");
         }
         */
-        AirportNameField = useIcao ? "ICAO" : "IATA";
+        AirportNameField = configSubOptions.UseIcao ? "ICAO" : "IATA";
     }
 
     protected override IAdvected CreatePoint()

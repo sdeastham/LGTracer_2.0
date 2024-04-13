@@ -105,16 +105,8 @@ public class Program
         {
             Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
 
-            double kgPerPoint = configOptions.PointsDense.KgPerPoint;
-
             // The point manager holds all the actual point data and controls velocity calculations (in deg/s)
-            string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
-                configOptions.PointsDense.OutputFilename);
-            PointManager pointManager = new PointManagerDense(configOptions.PointsDense.Max, domainManager,
-                configOptions.InputOutput.OutputDirectory, configOptions.PointsDense.OutputFilename,
-                startDate, includeCompression: configOptions.PointsDense.AdiabaticCompression,
-                propertyNames: configOptions.PointsDense.OutputVariables, rng: pmRNG, kgPerPoint: kgPerPoint,
-                verboseOutput: configOptions.Verbose);
+            PointManager pointManager = new PointManagerDense(domainManager, configOptions, configOptions.PointsDense, pmRNG);
 
             // Scatter N points randomly over the domain
             (double[] xInitial, double[] yInitial, double[] pInitial) =
@@ -136,15 +128,7 @@ public class Program
                 configOptions.PointsFlights.OutputFilename);
             // TODO: Just pass configOptions.PointsFlights to the point manager!
             double pointPeriod = configOptions.PointsFlights.PointSpacing;
-            PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                configOptions.InputOutput.OutputDirectory,configOptions.PointsFlights.OutputFilename,
-                startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
-                contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
-                includeSettling: configOptions.PointsFlights.IncludeSettling,
-                includeCompression: configOptions.PointsFlights.AdiabaticCompression,
-                propertyNames: configOptions.PointsFlights.OutputVariables,
-                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao, rng: pmRNG,
-                minimumLifetime: configOptions.PointsFlights.MinimumLifetime * 3600.0);
+            PointManagerFlight pointManager = new PointManagerFlight(domainManager, configOptions, configOptions.PointsFlights, pmRNG);
 
             if (configOptions.PointsFlights.ScheduleFilename != null)
             {

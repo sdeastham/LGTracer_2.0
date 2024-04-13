@@ -72,24 +72,24 @@ public abstract class PointManager
 
     private DateTime StorageStartTime;
 
-    public PointManager(long? maxPoints, DomainManager domain, string outputDirectory, string filename,
-        DateTime storageStartTime, bool verboseOutput = false, bool includeCompression = false,
-        string[]? propertyNames = null)
+    public PointManager(DomainManager domain, LGOptions configOptions, LGOptionsPoints configSubOptions)
     {
         // UIDs start from 1 (0 reserved for inactive points)
         nextUID = 1;
 
         VelocityCalc = VCalc;
+
+        long? maxPoints = configSubOptions.Max;
             
         // Are we calculating the effect of adiabatic compression?
-        IncludeCompression = includeCompression;
+        IncludeCompression = configSubOptions.AdiabaticCompression;
 
         // Where to output data
-        OutputDirectory = outputDirectory;
-        OutputFilename = filename;
+        OutputDirectory = configOptions.InputOutput.OutputDirectory;
+        OutputFilename = configSubOptions.OutputFilename;
         
         // The start of the current storage period
-        StorageStartTime = storageStartTime;
+        StorageStartTime = configOptions.Timing.StartDate;
             
         // Limit on how many points can be managed
         if (maxPoints == null)
@@ -106,13 +106,13 @@ public abstract class PointManager
         InactivePoints = [];
         NActive = 0;
         NInactive = 0;
-        InitializeHistory(propertyNames);
+        InitializeHistory(configSubOptions.OutputVariables);
 
         // Domain manager to use for culling etc
         Domain = domain;
 
         // Run in debug mode?
-        VerboseOutput = verboseOutput;
+        VerboseOutput = configOptions.Verbose;
         return;
 
         // Set the velocity calculation

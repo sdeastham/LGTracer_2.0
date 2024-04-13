@@ -3,18 +3,16 @@ namespace LGTracer;
 public class PointManagerDense : PointManager
 {
     // A "dense" point manager is designed to represent ALL air within the domain
-    public double MassSurplus;
-    private Random Rng;
-    private double KgPerPoint;
+    protected double MassSurplus;
+    protected readonly Random Rng;
+    protected readonly double KgPerPoint;
 
-    public PointManagerDense( long? maxPoints, DomainManager domain, string outputDirectory, string filename,
-        DateTime storageStartTime, bool verboseOutput=false, bool includeCompression=false, 
-        string[]? propertyNames=null, Random? rng=null, double kgPerPoint=1.0e12 ) : base(maxPoints,domain,
-        outputDirectory,filename,storageStartTime,verboseOutput,includeCompression,propertyNames)
+    public PointManagerDense( DomainManager domain, LGOptions configOptions, LGOptionsPointsDense configSubOptions,
+        Random rng) : base(domain, configOptions, configSubOptions)
     {
         // No initial mass surplus
         MassSurplus = 0.0;
-        KgPerPoint = kgPerPoint;
+        KgPerPoint = configSubOptions.KgPerPoint;
         Rng = rng;
     }
         
