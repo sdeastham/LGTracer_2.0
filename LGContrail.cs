@@ -1,3 +1,4 @@
+using System.Reflection.PortableExecutable;
 using MathNet.Numerics;
 
 namespace LGTracer;
@@ -37,13 +38,14 @@ public class LGContrail : LGPointConnected
     private const double GammaRatio = 0.4 / 1.4;
     private double WaterVapourEmissionsIndex = 1.223; // kg H2O per kg fuel
     private double LowerHeatingValue = 43.2e6; // J/kg
-    private bool SkipNewtonIteration;
+    private bool SkipNewtonIterationForTlm;
+    private bool UsePonaterTlc;
     
     public Func<double, double, double, (double, double, double)> VelocityCalcNoSettling { get; protected set; }
 
     public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression,
-        bool includeSettling, double minimumPointLifetime=0.0, bool skipNewtonIteration=false) :
-        base(vCalc, minimumPointLifetime)
+        bool includeSettling, double minimumPointLifetime=0.0, bool skipNewtonIterationForTlm=false,
+        bool usePonaterTlc=false) : base(vCalc, minimumPointLifetime)
     {
         // Override vCalc to allow for inclusion of a settling speed
         VelocityCalcNoSettling = vCalc;
@@ -55,11 +57,13 @@ public class LGContrail : LGPointConnected
         {
             VelocityCalc = VelocityCalcNoSettling;
         }
-        // Do we use newton iteration to evaluate SAC?
-        SkipNewtonIteration = skipNewtonIteration;
+        // Do we use newton iteration to evaluate threshold temperature?
+        SkipNewtonIterationForTlm = skipNewtonIterationForTlm;
+        // Do we use the Ponater approach for SAC (skipping critical temperature calculation)?
+        UsePonaterTlc = usePonaterTlc;
         IncludeCompression = includeCompression;
         ZeroContrail();
-        // Contrails are NOT valid by default
+        // Contrail points are NOT valid by default
         DefaultValidity = false;
     }
 
@@ -85,9 +89,20 @@ public class LGContrail : LGPointConnected
         LowerHeatingValue = lowerHeatingValue;
         WaterVapourEmissionsIndex = waterVapourEmissionsIndex;
         // Do we pass the Schmidt-Appleman Criterion?
-        double criticalTemperatureDelta = CriticalTemperatureDelta(efficiency);
-        if (criticalTemperatureDelta >= 0.0)
+        bool contrailFormed;
+        if (UsePonaterTlc)
+        {
+            // Positive means we are above (i.e. humid enough)
+            double criticalRelativeHumidityDelta = CriticalRelativeHumidityDelta(efficiency);
+            contrailFormed = criticalRelativeHumidityDelta >= 0.0;
+        }
+        else
+        {
+            // Negative means that we are below (i.e. cold enough)
+            double criticalTemperatureDelta = CriticalTemperatureDelta(efficiency);
             contrailFormed = criticalTemperatureDelta < 0.0;
+        }
+        if (!contrailFormed)
         {
             // Local temperature is above critical
             ZeroContrail();
@@ -148,17 +163,36 @@ public class LGContrail : LGPointConnected
 
     private double CriticalTemperatureDelta(double efficiency)
     {
-        return Temperature - CalculateCriticalTemperature(Pressure, Temperature, efficiency, AmbientRelativeHumidityLiquid,
-            WaterVapourEmissionsIndex,LowerHeatingValue);
+        return Temperature - CalculateCriticalTemperature(Pressure, efficiency, AmbientRelativeHumidityLiquid,
+            WaterVapourEmissionsIndex,LowerHeatingValue,SkipNewtonIterationForTlm);
     }
 
-    private static double CalculateCriticalTemperature(double pressure, double temperature, double efficiency, double relativeHumidity,
-        double waterVapourEmissionsIndex, double lowerHeatingValue)
+    private double CriticalRelativeHumidityDelta(double efficiency)
+    {
+        return AmbientRelativeHumidityLiquid - CalculateCriticalRelativeHumidityLiquid(Pressure, Temperature, efficiency,
+            WaterVapourEmissionsIndex,LowerHeatingValue,SkipNewtonIterationForTlm);
+    }
+
+    private static double CalculateCriticalTemperature(double pressure, double efficiency, double relativeHumidity,
+        double waterVapourEmissionsIndex, double lowerHeatingValue, bool approximateTlm=false)
     {
         double mixingLineGradient = MixingLineGradient(pressure, efficiency, waterVapourEmissionsIndex, lowerHeatingValue);
-        double thresholdTemperature = NewtonIterTlm(mixingLineGradient);
+        double thresholdTemperature = approximateTlm ? EstimateLiquidThresholdTemperature(mixingLineGradient) : NewtonIterTlm(mixingLineGradient);
         double criticalTemperature = NewtonIterTlc(mixingLineGradient, thresholdTemperature, relativeHumidity);
         return criticalTemperature;
+    }
+    
+    private static double CalculateCriticalRelativeHumidityLiquid(double pressure, double temperature, double efficiency,
+        double waterVapourEmissionsIndex, double lowerHeatingValue, bool approximateTlm=false)
+    {
+        // G
+        double mixingLineGradient = MixingLineGradient(pressure, efficiency, waterVapourEmissionsIndex, lowerHeatingValue);
+        // Tlm
+        double thresholdTemperature = approximateTlm ? EstimateLiquidThresholdTemperature(mixingLineGradient) : NewtonIterTlm(mixingLineGradient);
+        double pSatTlm = Physics.SaturationPressureLiquid(thresholdTemperature);
+        double pSat = Physics.SaturationPressureLiquid(temperature);
+        // Equation 12 from Schumann (2012)
+        return (mixingLineGradient * (temperature - thresholdTemperature) + pSatTlm) / pSat;
     }
 
     private static double MixingLineGradient(double pressure, double efficiency, double waterVapourEmissionsIndex=1.223,
@@ -328,7 +362,23 @@ public class LGContrail : LGPointConnected
             pressure, temperature, rh, efficiency,maxError,iterate);
         success = success && Evaluate("Hydrogen", 120.0, 8.94, 3.82, -41.2, -32.7,
             pressure, temperature, rh, efficiency,maxError,iterate);
-        return success;
+
+        // Verify that both approaches to checking SAC give the same result for a sweep which spans from
+        // SAC = True to SAC = False
+        double tMin = -52.0;
+        double tMax = -49.0;
+        double dt = 0.02;
+        int nChecks = (int)Math.Ceiling((tMax - tMin) / dt);
+        double tCurr = tMin;
+        bool agreedTlcUlc = true;
+        while (tCurr <= tMax)
+        {
+            agreedTlcUlc = agreedTlcUlc && CompareTlcUlc(43.0, 1.25, pressure, tCurr, rh, 
+                efficiency, iterate, tCurr <= tMin + dt/2.0 || tCurr >= tMax - dt);
+            tCurr += dt;
+        }
+        Console.WriteLine($"Agreement between SAC calculation approaches: {agreedTlcUlc}");
+        return success && agreedTlcUlc;
     }
     
     public static bool Evaluate(string name, double lhv, double eiH2O, double refG, double refTLC, double refTLM,
@@ -352,14 +402,52 @@ public class LGContrail : LGPointConnected
             criticalTemperature =
                 NewtonIterTlc(mixingLineGradient, thresholdTemperature, rh, criticalTemperature);
         }
+        double criticalRelativeHumidity = CalculateCriticalRelativeHumidityLiquid(pressure, temperature, efficiency,
+            eiH2O, lhv*1.0e6, approximateTlm: iterate);
         double mixingLineError = mixingLineGradient / refG - 1.0;
         double tlmError = thresholdTemperature / (273.15+refTLM) - 1.0;
         double tlcError = criticalTemperature / (273.15+refTLC) - 1.0;
-        Console.WriteLine($"Evaluation for {name} (iteration: {iterate}):");
-        Console.WriteLine($" --> Mixing line gradient G    : {mixingLineGradient,9:f3} vs {refG,9:f3} Pa/K, {100.0*mixingLineError,9:f4}% error");
-        Console.WriteLine($" --> Threshold temperature T_LM: {thresholdTemperature-273.15,9:f3} vs {refTLM,9:f3} C,    {100.0*tlmError,9:f4}% error");
-        Console.WriteLine($" --> Critical temperature T_LC : {criticalTemperature-273.15,9:f3} vs {refTLC,9:f3} C,    {100.0*tlcError,9:f4}% error");
+        Console.WriteLine($"Evaluation for {name} (iteration: {iterate}) [T={ambientTemperature,9:f3} C, RHl={ambientRH,9:f3}%]:");
+        Console.WriteLine($" --> Mixing line gradient G     : {mixingLineGradient,9:f3} vs {refG,9:f3} Pa/K, {100.0*mixingLineError,9:f4}% error");
+        Console.WriteLine($" --> Threshold temperature T_LM : {thresholdTemperature-273.15,9:f3} vs {refTLM,9:f3} C,    {100.0*tlmError,9:f4}% error");
+        Console.WriteLine($" --> Critical temperature T_LC  : {criticalTemperature-273.15,9:f3} vs {refTLC,9:f3} C,    {100.0*tlcError,9:f4}% error");
+        Console.WriteLine($" --> Critical RH U_LC (Ponater) : {criticalRelativeHumidity*100.0,9:f3}%");
+        Console.WriteLine($" -----> Formation (Schumann/Ponater): {temperature<=criticalTemperature}/{rh>=criticalRelativeHumidity}");
         return (mixingLineError < maxError && tlmError < maxError && tlcError < maxError);
+    }
+    
+    public static bool CompareTlcUlc(double lhv, double eiH2O,
+        double ambientPressure, double ambientTemperature, double ambientRH, double efficiency, bool iterate=true, bool verbose=true)
+    {
+        // Input units follow Schumann (1996), i.e. LHV in MJ/kg, temperatures in C
+        double temperature = ambientTemperature + 273.15; // Convert C to K
+        double pressure = ambientPressure * 100.0; // Convert hPa to Pa 
+        double rh = ambientRH * 0.01; // Convert % to fraction
+        double mixingLineGradient = MixingLineGradient(pressure, efficiency, eiH2O, lhv*1.0e6);
+        double pSatAmbient = Physics.SaturationPressureLiquid(temperature);
+        double thresholdTemperature = EstimateLiquidThresholdTemperature(mixingLineGradient);
+        if (iterate)
+        {
+            thresholdTemperature = NewtonIterTlm(mixingLineGradient, thresholdTemperature);
+        }
+        double criticalTemperature = EstimateCriticalTemperature(thresholdTemperature, mixingLineGradient, rh);
+        if (iterate)
+        {
+            criticalTemperature =
+                NewtonIterTlc(mixingLineGradient, thresholdTemperature, rh, criticalTemperature);
+        }
+        double criticalRelativeHumidity = CalculateCriticalRelativeHumidityLiquid(pressure, temperature, efficiency,
+            eiH2O, lhv*1.0e6, approximateTlm: iterate);
+        bool tlcCheck = temperature <= criticalTemperature;
+        bool rhCheck = rh >= criticalRelativeHumidity;
+        if (!verbose) { return tlcCheck == rhCheck; }
+        Console.WriteLine($"P/S comparison (iteration: {iterate}) [T={ambientTemperature,9:f3} C, RHl={ambientRH,9:f3}%]:");
+        Console.WriteLine($" --> Mixing line gradient G     : {mixingLineGradient,9:f3} Pa/K");
+        Console.WriteLine($" --> Threshold temperature T_LM : {thresholdTemperature-273.15,9:f3} C");
+        Console.WriteLine($" --> Critical temperature T_LC  : {criticalTemperature-273.15,9:f3} C");
+        Console.WriteLine($" --> Critical RH U_LC (Ponater) : {criticalRelativeHumidity*100.0,9:f3}%");
+        Console.WriteLine($" -----> Formation (T_LC/U_LC): {tlcCheck}/{rhCheck}");
+        return tlcCheck == rhCheck;
     }
 
     public override void Deactivate()

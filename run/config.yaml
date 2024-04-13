@@ -1,7 +1,7 @@
 ﻿---
 timing:
   start-date: "2023-01-01 00:00:00"
-  end-date: "2023-01-05 00:00:00"
+  end-date: "2023-01-02 00:00:00"
 timesteps:
   # Simulation heartbeat (seconds)
   simulation: 300.0
@@ -46,7 +46,8 @@ points-flights:
   include-settling: true
   # Complex contrails incur more computational cost
   complex-contrails: false
-  skip-newton-iteration: false
+  skip-newton-iteration-for-tlm: true
+  use-ponater-tlc: false
   point-spacing: 300.0
   # To ensure ongoing location collection - in hours
   minimum-lifetime: 3.0
