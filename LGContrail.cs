@@ -87,6 +87,7 @@ public class LGContrail : LGPointConnected
         // Do we pass the Schmidt-Appleman Criterion?
         double criticalTemperatureDelta = CriticalTemperatureDelta(efficiency);
         if (criticalTemperatureDelta >= 0.0)
+            contrailFormed = criticalTemperatureDelta < 0.0;
         {
             // Local temperature is above critical
             ZeroContrail();
