@@ -16,23 +16,6 @@ public class PointManagerFlight : PointManager
     protected Random? RandomNumberGenerator;
     protected double MinimumPointLifetime;
 
-    /*
-     Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
-            string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
-                configOptions.PointsFlights.OutputFilename);
-            // TODO: Just pass configOptions.PointsFlights to the point manager!
-            double pointPeriod = configOptions.PointsFlights.PointSpacing;
-            PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                configOptions.InputOutput.OutputDirectory,configOptions.PointsFlights.OutputFilename,
-                startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
-                contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
-                includeSettling: configOptions.PointsFlights.IncludeSettling,
-                includeCompression: configOptions.PointsFlights.AdiabaticCompression,
-                propertyNames: configOptions.PointsFlights.OutputVariables,
-                verboseOutput: configOptions.Verbose, useIcao: configOptions.PointsFlights.UseIcao, rng: pmRNG,
-                minimumLifetime: configOptions.PointsFlights.MinimumLifetime * 3600.0);
-     */
-    
     public PointManagerFlight( DomainManager domain, LGOptions configOptions, LGOptionsPointsFlights configSubOptions, Random rng ) : base(
         domain, configOptions, configSubOptions )
     {
