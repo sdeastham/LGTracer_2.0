@@ -89,6 +89,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public bool ComplexContrails = false;
     public bool UseIcao = true;
     public double MinimumLifetime = 0.0;
+    public bool SkipNewtonIteration = false;
 }
 
 public class LGOptionsDomain

@@ -15,6 +15,7 @@ public class PointManagerFlight : PointManager
     private string AirportNameField;
     protected Random? RandomNumberGenerator;
     protected double MinimumPointLifetime;
+    protected bool SkipNewtonIteration;
 
     public PointManagerFlight( DomainManager domain, LGOptions configOptions, LGOptionsPointsFlights configSubOptions, Random rng ) : base(
         domain, configOptions, configSubOptions )
@@ -26,6 +27,7 @@ public class PointManagerFlight : PointManager
         ContrailSimulation = configSubOptions.ContrailSimulation;
         IncludeSettling = configSubOptions.IncludeSettling;
         MinimumPointLifetime = configSubOptions.MinimumLifetime;
+        SkipNewtonIteration = configSubOptions.SkipNewtonIteration;
         // Run contrail test suite
         /*
         if (ContrailSimulation && !LGContrail.TestSAC(true))
@@ -38,7 +40,7 @@ public class PointManagerFlight : PointManager
 
     protected override IAdvected CreatePoint()
     {
-        return ContrailSimulation ? new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling, MinimumPointLifetime) : new LGPointConnected(VelocityCalc, MinimumPointLifetime);
+        return ContrailSimulation ? new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling, MinimumPointLifetime, SkipNewtonIteration) : new LGPointConnected(VelocityCalc, MinimumPointLifetime);
     }
 
     public bool SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,

@@ -37,10 +37,12 @@ public class LGContrail : LGPointConnected
     private const double GammaRatio = 0.4 / 1.4;
     private double WaterVapourEmissionsIndex = 1.223; // kg H2O per kg fuel
     private double LowerHeatingValue = 43.2e6; // J/kg
+    private bool SkipNewtonIteration;
     
     public Func<double, double, double, (double, double, double)> VelocityCalcNoSettling { get; protected set; }
 
-    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression, bool includeSettling, double minimumPointLifetime=0.0) :
+    public LGContrail(Func<double, double, double, (double, double, double)> vCalc, bool includeCompression,
+        bool includeSettling, double minimumPointLifetime=0.0, bool skipNewtonIteration=false) :
         base(vCalc, minimumPointLifetime)
     {
         // Override vCalc to allow for inclusion of a settling speed
@@ -53,6 +55,8 @@ public class LGContrail : LGPointConnected
         {
             VelocityCalc = VelocityCalcNoSettling;
         }
+        // Do we use newton iteration to evaluate SAC?
+        SkipNewtonIteration = skipNewtonIteration;
         IncludeCompression = includeCompression;
         ZeroContrail();
         // Contrails are NOT valid by default
@@ -194,7 +198,7 @@ public class LGContrail : LGPointConnected
         double relativeHumidity)
     {
         // Notation here is from Schumann (1996). Implements the estimation approach in Appendix 2 to provide a first
-        // guess for subsequent Newton-Raphson iteration.
+        // guess for subsequent Newton-Raphson iteration. Updated to follow Schumann (2012).
         // * thresholdTemperature     T_LM in Schumann (1996), T_Max in Gierens (2021) [K]
         // * mixingLineGradient       G, in Pa/K
         // * relativeHumidity         RH with respect to liquid as a fraction (0-1)
@@ -208,7 +212,8 @@ public class LGContrail : LGPointConnected
         double d2PSatByD2T = (Physics.SaturationPressureLiquid(thresholdTemperature + dT) - 2.0 * pSat +
                               Physics.SaturationPressureLiquid(thresholdTemperature - dT)) / (dT * dT);
         // This is a 2nd-order Taylor expansion around T_LM to find T_LC
-        double commonFactor = 1.0 / (relativeHumidity * relativeHumidity * d2PSatByD2T);
+        // Updated based on Schumann (2012), which states that U**2 in equation 34 (for commonFactor) should be U
+        double commonFactor = 1.0 / (relativeHumidity * d2PSatByD2T);
         double aFactor = (1.0 - relativeHumidity) * mixingLineGradient * commonFactor;
         double bFactor = (pSat - pSatFraction) * commonFactor;
         // offsetTemperature is x in Schumann (1996); just the difference between T_LC and T_LM

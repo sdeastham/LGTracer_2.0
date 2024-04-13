@@ -46,6 +46,7 @@ points-flights:
   include-settling: true
   # Complex contrails incur more computational cost
   complex-contrails: false
+  skip-newton-iteration: false
   point-spacing: 300.0
   # To ensure ongoing location collection - in hours
   minimum-lifetime: 3.0
