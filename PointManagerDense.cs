@@ -7,9 +7,10 @@ public class PointManagerDense : PointManager
     private Random Rng;
     private double KgPerPoint;
 
-    public PointManagerDense( long? maxPoints, DomainManager domain, string filename, bool verboseOutput=false, 
-        bool includeCompression=false, string[]? propertyNames=null, Random? rng=null,
-        double kgPerPoint=1.0e12 ) : base(maxPoints,domain,filename,verboseOutput,includeCompression,propertyNames)
+    public PointManagerDense( long? maxPoints, DomainManager domain, string outputDirectory, string filename,
+        DateTime storageStartTime, bool verboseOutput=false, bool includeCompression=false, 
+        string[]? propertyNames=null, Random? rng=null, double kgPerPoint=1.0e12 ) : base(maxPoints,domain,
+        outputDirectory,filename,storageStartTime,verboseOutput,includeCompression,propertyNames)
     {
         // No initial mass surplus
         MassSurplus = 0.0;

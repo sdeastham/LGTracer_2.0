@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using MathNet.Numerics.Random;
 
 using YamlDotNet.Serialization;
@@ -46,9 +47,15 @@ public class Program
         // Major simulation settings
         DateTime startDate = configOptions.Timing.StartDate;
         DateTime endDate = configOptions.Timing.EndDate;
-        double dt = configOptions.Timesteps.Simulation; // Time step in seconds
-        double dtStorage = 60.0 * configOptions.Timesteps.Storage; // How often to save out data (seconds)
-        double dtReport = 60.0 * configOptions.Timesteps.Reporting; // How often to report to the user?
+        // Time step in seconds
+        double dt = configOptions.Timesteps.Simulation;
+        // How often to add data to the in-memory archive?
+        double dtStorage = 60.0 * configOptions.Timesteps.Storage;
+        // How often to report to the user?
+        double dtReport = 60.0 * configOptions.Timesteps.Reporting;
+        // How often to write the in-memory archive to disk?
+        //double dtOutput = TimeSpan.ParseExact(configOptions.Timesteps.Output,"hhmmss",CultureInfo.InvariantCulture).TotalSeconds;
+        double dtOutput = LGOptions.ParseHms(configOptions.Timesteps.Output);
             
         DateTime currentDate = startDate; // DateTime is a value type so this creates a new copy
         
@@ -69,8 +76,9 @@ public class Program
         double tStop = tStart + duration;
         double tCurr = tStart;
         int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
-        double tStorage = tStart; // Next time that we want storage to occur
         double tReport = tStart; // Next time we want output to go to the user
+        double tStorage = tStart + dtStorage; // Next time that we want data to be added to the in-memory archive
+        double tOutput = tStart + dtOutput; // Next time we want the in-memory archive to be written to file
             
         List<PointManager> pointManagers = [];
 
@@ -103,7 +111,8 @@ public class Program
             string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
                 configOptions.PointsDense.OutputFilename);
             PointManager pointManager = new PointManagerDense(configOptions.PointsDense.Max, domainManager,
-                outputFileName, includeCompression: configOptions.PointsDense.AdiabaticCompression,
+                configOptions.InputOutput.OutputDirectory, configOptions.PointsDense.OutputFilename,
+                startDate, includeCompression: configOptions.PointsDense.AdiabaticCompression,
                 propertyNames: configOptions.PointsDense.OutputVariables, rng: pmRNG, kgPerPoint: kgPerPoint,
                 verboseOutput: configOptions.Verbose);
 
@@ -128,7 +137,8 @@ public class Program
             // TODO: Just pass configOptions.PointsFlights to the point manager!
             double pointPeriod = configOptions.PointsFlights.PointSpacing;
             PointManagerFlight pointManager = new PointManagerFlight(configOptions.PointsFlights.Max, domainManager,
-                outputFileName, startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
+                configOptions.InputOutput.OutputDirectory,configOptions.PointsFlights.OutputFilename,
+                startDate, pointPeriod, configOptions.PointsFlights.SegmentsOutputFilename,
                 contrailSimulation: configOptions.PointsFlights.ContrailSimulation,
                 includeSettling: configOptions.PointsFlights.IncludeSettling,
                 includeCompression: configOptions.PointsFlights.AdiabaticCompression,
@@ -153,21 +163,22 @@ public class Program
             }
                 
             // Add to the list of _all_ point managers
-            pointManagers.Add((PointManager)pointManager);
+            pointManagers.Add(pointManager);
         }
 
+        /*
         foreach (PointManager pointManager in pointManagers)
         {
             // Store initial conditions
             pointManager.ArchiveConditions(tCurr);
         }
+        */
 
         if (pointManagers.Count == 0)
         {
             throw new ArgumentException("No point managers enabled.");
         }
 
-        tStorage += dtStorage;
         int nStored = 1;
 
         // Don't report at initialization
@@ -210,6 +221,21 @@ public class Program
             nSteps++;
             tCurr = (iter+1) * dt;
             currentDate = currentDate.AddSeconds(dt);
+            
+            // Update the user on simulation progress
+            if (tCurr >= (tReport - 1.0e-10))
+            {
+                long totalActive = pointManagers.Sum(pm => pm.NActive);
+                Console.WriteLine($" --> Time at end of time step: {currentDate}. Point count across all managers: {totalActive,10:d}");
+                tReport += dtReport;
+                pointSum += totalActive;
+                nReports++;
+            }
+            else if (accuratePointAverage)
+            {
+                long totalActive = pointManagers.Sum(pm => pm.NActive);
+                pointSum += totalActive;
+            }
 
             // For diagnostics - must take place AFTER tCurr advances
             // Only store data every dtStorage seconds. Use a small offset
@@ -225,30 +251,25 @@ public class Program
                 tStorage += dtStorage;
                 nStored += 1;
             }
-            if (tCurr >= (tReport - 1.0e-10))
+            
+            if (tCurr >= tOutput - 1.0e-10)
             {
-                long totalActive = pointManagers.Sum(pm => pm.NActive);
-                Console.WriteLine($" --> Time at end of time step: {currentDate}. Point count across all managers: {totalActive,10:d}");
-                tReport += dtReport;
-                pointSum += totalActive;
-                nReports++;
-            }
-            else if (accuratePointAverage)
-            {
-                long totalActive = pointManagers.Sum(pm => pm.NActive);
-                pointSum += totalActive;
+                subwatches["File writing"].Start();
+                foreach (PointManager pointManager in pointManagers)
+                {
+                    long maxPoints = pointManager.MaxStoredPoints;
+                    string fileName = pointManager.WriteToFile(currentDate,reset: true);
+                    if (verbose)
+                    {
+                        Console.WriteLine(
+                            $"Output data with {nStored} samples [max points stored: {maxPoints}] successfully written to {fileName}.");
+                    }
+                }
+                tOutput += dtOutput;
+                nStored = 0;
+                subwatches["File writing"].Stop();
             }
         }
-        subwatches["File writing"].Start();
-        foreach (PointManager pointManager in pointManagers)
-        {
-            bool success = pointManager.WriteToFile();
-            Console.WriteLine(
-                success
-                    ? $"Output data with {nStored} samples [max points stored: {pointManager.MaxStoredPoints}] successfully written to {pointManager.OutputFilename}"
-                    : $"Could not write output to {pointManager.OutputFilename}");
-        }
-        subwatches["File writing"].Stop();
         
         watch.Stop();
         long elapsedTimeLong = watch.ElapsedMilliseconds;

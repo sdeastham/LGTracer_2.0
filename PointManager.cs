@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
@@ -47,9 +48,13 @@ public abstract class PointManager
 
     private List<double> TimeHistory;
 
-    private List<List<double[]>> PropertyHistory;
+    //private List<List<double[]>> PropertyHistory;
 
-    private List<string> PropertyNames;
+    //private List<string> PropertyNames;
+
+    private Dictionary<string, List<double[]>> PropertyHistory;
+
+    private List<string> PropertyNames => PropertyHistory.Keys.ToList();
     
     public long MaxStoredPoints
     { get; private set; }
@@ -61,9 +66,15 @@ public abstract class PointManager
 
     public string OutputFilename
     { get; private set; }
+    
+    public string OutputDirectory
+    { get; private set; }
 
-    public PointManager(long? maxPoints, DomainManager domain, string filename, bool verboseOutput = false,
-        bool includeCompression = false, string[]? propertyNames = null)
+    private DateTime StorageStartTime;
+
+    public PointManager(long? maxPoints, DomainManager domain, string outputDirectory, string filename,
+        DateTime storageStartTime, bool verboseOutput = false, bool includeCompression = false,
+        string[]? propertyNames = null)
     {
         // UIDs start from 1 (0 reserved for inactive points)
         nextUID = 1;
@@ -74,7 +85,11 @@ public abstract class PointManager
         IncludeCompression = includeCompression;
 
         // Where to output data
+        OutputDirectory = outputDirectory;
         OutputFilename = filename;
+        
+        // The start of the current storage period
+        StorageStartTime = storageStartTime;
             
         // Limit on how many points can be managed
         if (maxPoints == null)
@@ -87,33 +102,11 @@ public abstract class PointManager
             MaxPoints = (long)maxPoints;
         }
 
-        // Max number of points stored out in any single sample (diagnostic only)
-        MaxStoredPoints = 0;
-
         ActivePoints = [];
         InactivePoints = [];
         NActive = 0;
         NInactive = 0;
-
-        // For output
-        TimeHistory = [];
-        XHistory = [];
-        YHistory = [];
-        PressureHistory = [];
-        AgeHistory = [];
-        UIDHistory = [];
-
-        PropertyNames = [];
-        PropertyHistory = [];
-        if (propertyNames != null)
-        {
-            foreach (string property in propertyNames)
-            {
-                PropertyNames.Add(property);
-                List<double[]> newProperty = [];
-                PropertyHistory.Add(newProperty);
-            }
-        }
+        InitializeHistory(propertyNames);
 
         // Domain manager to use for culling etc
         Domain = domain;
@@ -134,7 +127,42 @@ public abstract class PointManager
     {
         return new LGPoint(VelocityCalc);
     }
-        
+
+    private void InitializeHistory(string[]? propertyNames)
+    {
+        PropertyHistory = [];
+        if (propertyNames != null)
+        {
+            foreach (string property in propertyNames)
+            {
+                List<double[]> newProperty = [];
+                PropertyHistory.Add(property,newProperty);
+            }
+        }
+        InitializeHistory();
+    }
+    private void InitializeHistory()
+    {
+        // Max number of points stored out in any single sample (diagnostic only)
+        MaxStoredPoints = 0;
+
+        // For output
+        TimeHistory = [];
+        XHistory = [];
+        YHistory = [];
+        PressureHistory = [];
+        AgeHistory = [];
+        UIDHistory = [];
+
+        List<string> propertyNames = PropertyHistory.Keys.ToList();
+        PropertyHistory.Clear();
+        foreach (string property in propertyNames)
+        {
+            List<double[]> newProperty = [];
+            PropertyHistory[property] = newProperty;
+        }
+    }
+    
     private IAdvected AddPoint( double x, double y, double pressure )
     {
         // Create a new point in the list
@@ -239,13 +267,17 @@ public abstract class PointManager
         }
     }
 
-    public virtual bool WriteToFile()
+    public virtual string WriteToFile(DateTime currentTime, bool reset=true)
     {
-        return WriteToFile(OutputFilename);
-    }
-    private bool WriteToFile(string fileName)
-    {
+        // Start by assuming success
         bool success = true;
+        
+        // Parse the file name
+        string fileNameShort = OutputFilename.Replace("{date}", StorageStartTime.ToString("yyyyMMddTHHmmss"));
+        string fileName = Path.Join(OutputDirectory, fileNameShort);
+        
+        // Advance the time to be used for storage next time around
+        StorageStartTime = currentTime;
 
         // Set up output file
         var dsUri = new NetCDFUri
@@ -287,9 +319,15 @@ public abstract class PointManager
                     p2D[i,j] = PressureHistory[i][j];
                     age2D[i,j] = AgeHistory[i][j];
                     UIDs[i,j] = UIDHistory[i][j];
-                    for (int k = 0; k < nProperties; k++)
+                    //for (int k = 0; k < nProperties; k++)
+                    //{
+                    //    properties2D[k,i,j] = PropertyHistory[k][i][j];
+                    //}
+                    int k = 0;
+                    foreach (string property in PropertyNames)
                     {
-                        properties2D[k,i,j] = PropertyHistory[k][i][j];
+                        properties2D[k,i,j] = PropertyHistory[property][i][j];
+                        k++;
                     }
                 }
                 else
@@ -331,8 +369,14 @@ public abstract class PointManager
                 
             ds.Commit();
         }
+
+        if (reset)
+        {
+            MaxStoredPoints = 0;
+            InitializeHistory();
+        }
             
-        return success;
+        return fileName;
     }
 
     public void ArchiveConditions(double tCurr)
@@ -361,10 +405,18 @@ public abstract class PointManager
             // Need to allow for different point classes
             // It would be better here to register the get methods at manager initialization, but
             // that may not be straightforward
-            for (int k = 0; k < nProperties; k++)
+            int k = 0;
+            foreach (string property in PropertyNames)
+            {
+                properties[k][i] = point.GetProperty(property);
+                k++;
+            }
+            /*
+             for (int k = 0; k < nProperties; k++)
             {
                 properties[k][i] = point.GetProperty(PropertyNames[k]);
             }
+            */
             i++;
         }
         TimeHistory.Add(tCurr);
@@ -373,9 +425,17 @@ public abstract class PointManager
         PressureHistory.Add(pressurePoints);
         UIDHistory.Add(UIDs);
         AgeHistory.Add(ages);
+        /*
         for (int k = 0; k < nProperties; k++)
         {
             PropertyHistory[k].Add(properties[k]);
+        }
+        */
+        int iProperty = 0;
+        foreach (string property in PropertyNames)
+        {
+            PropertyHistory[property].Add(properties[iProperty]);
+            iProperty++;
         }
     }
 

@@ -30,13 +30,22 @@ public class LGOptions
 
     public LGOptions()
     {
-            PointsDense = new LGOptionsPointsDense();
-            PointsFlights = new LGOptionsPointsFlights();
-            Domain = new LGOptionsDomain();
-            Timesteps = new LGOptionsTimesteps();
-            Timing = new LGOptionsTiming();
-            InputOutput = new LGOptionsIO();
-        }
+        PointsDense = new LGOptionsPointsDense();
+        PointsFlights = new LGOptionsPointsFlights();
+        Domain = new LGOptionsDomain();
+        Timesteps = new LGOptionsTimesteps();
+        Timing = new LGOptionsTiming();
+        InputOutput = new LGOptionsIO();
+    }
+
+    public static double ParseHms(string hhmmss)
+    {
+        // Expects a string in the form hh:mm:ss
+        TimeSpan ts = new TimeSpan(int.Parse(hhmmss.Split(':')[0]),  // hours
+                                int.Parse(hhmmss.Split(':')[1]),   // minutes
+                                int.Parse(hhmmss.Split(':')[2])); // seconds
+        return ts.TotalSeconds;
+    }
 }
 
 public class LGOptionsTiming
@@ -50,6 +59,7 @@ public class LGOptionsTimesteps
     public double Simulation = 60.0;
     public double Reporting = 3600.0;
     public double Storage = 3600.0;
+    public string Output = "240000";
 }
 
 public abstract class LGOptionsPoints

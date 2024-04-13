@@ -17,11 +17,11 @@ public class PointManagerFlight : PointManager
     protected Random? RandomNumberGenerator;
     protected double MinimumPointLifetime;
 
-    public PointManagerFlight(long? maxPoints, DomainManager domain, string filename, DateTime initialSeedTime,
-        double pointPeriod, string segmentsOutputFilename,
-        bool verboseOutput = false, bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
+    public PointManagerFlight(long? maxPoints, DomainManager domain, string outputDirectory, string filename,
+        DateTime initialSeedTime, double pointPeriod, string segmentsOutputFilename, bool verboseOutput = false,
+        bool includeCompression = false, bool includeSettling = false, string[]? propertyNames = null,
         bool contrailSimulation = false, bool useIcao = false, Random? rng = null, double minimumLifetime=0.0) : base(
-        maxPoints, domain, filename, verboseOutput, includeCompression, propertyNames)
+        maxPoints, domain, outputDirectory, filename, initialSeedTime, verboseOutput, includeCompression, propertyNames)
     {
         RandomNumberGenerator = rng;
         LastSeedTime = initialSeedTime;
@@ -43,14 +43,7 @@ public class PointManagerFlight : PointManager
 
     protected override IAdvected CreatePoint()
     {
-        if (ContrailSimulation)
-        {
-            return new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling, MinimumPointLifetime);
-        }
-        else
-        {
-            return new LGPointConnected(VelocityCalc, MinimumPointLifetime);
-        }
+        return ContrailSimulation ? new LGContrail(VelocityCalc, IncludeCompression, IncludeSettling, MinimumPointLifetime) : new LGPointConnected(VelocityCalc, MinimumPointLifetime);
     }
 
     public bool SimulateFlight(double originLon, double originLat, double destinationLon, double destinationLat,
@@ -312,14 +305,6 @@ public class PointManagerFlight : PointManager
         {
             Console.WriteLine($"Schedule parsed. Found {nFlights} flights in {nEntries} schedule entries.");
         }
-    }
-
-    public override bool WriteToFile()
-    {
-        bool pointFileSuccess = base.WriteToFile();
-        // Also write segments to file!
-        bool segmentFileSuccess = true;
-        return (segmentFileSuccess && pointFileSuccess);
     }
 
     private class Airport(double longitude, double latitude, string nameIATA, string nameICAO, double elevation = 0.0)

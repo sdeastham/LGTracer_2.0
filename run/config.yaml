@@ -7,14 +7,17 @@ timesteps:
   simulation: 300.0
   # Diagnostic and output (minutes)
   reporting: 180.0
+  # Frequency data will be stored to file (minutes)
   storage: 5.0
+  # Frequency data will be written to disk (hh:mm:ss)
+  output: 24:00:00
 points-dense:
   max: 0
   initial: 1500
   # Calculate delta T due to pressure change?
   adiabatic-compression: true
   kg-per-point: 2.0e13
-  output-filename: dense-points.nc
+  output-filename: dense-points-{date}.nc
   output-variables: [ "temperature",
                       "relative_humidity_ice",
                       "relative_humidity_liquid",
@@ -26,7 +29,7 @@ points-flights:
   use-icao: true
   max: null
   adiabatic-compression: true
-  output-filename: flight-waypoints.nc
+  output-filename: flight-waypoints-{date}.nc
   # Not currently used
   segments-output-filename: flight-segments.nc
   output-variables: ["segment_length",
