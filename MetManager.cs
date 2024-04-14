@@ -52,7 +52,7 @@ public class MetManager
         // 3-hour instantaneous
         if (useSerial)
         {
-            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.{3}.05x0625.nc4");
+            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.I3.{3}.05x0625.serial");
         }
         else
         {
@@ -71,7 +71,7 @@ public class MetManager
         // 3-hour averaged, dynamics
         if (useSerial)
         {
-            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.{3}.05x0625.nc4");
+            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3dyn.{3}.05x0625.serial");
         }
         else
         {
@@ -89,7 +89,7 @@ public class MetManager
         // 3-hour averaged, cloud
         if (useSerial)
         {
-            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3cld.{3}.05x0625.nc4");
+            currentTemplate = Path.Combine(metDir, "{0}/{1,2:d2}/MERRA2.{0}{1,2:d2}{2,2:d2}.A3cld.{3}.05x0625.serial");
         }
         else
         {
