@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Text.Json.Serialization.Metadata;
 using AtmosTools;
 
 namespace LGTracer;
@@ -78,6 +79,9 @@ public class DomainManager
 
     public double[,,] YSpeedXYP => Meteorology.VWindXYP;
 
+    public double[,,] VerticalXShearXYP; // dU/dz
+    public double[,,] VerticalYShearXYP; // dV/dz
+
     public double[,,] PressureVelocityXYP => Meteorology.PressureVelocityXYP;
 
     public double[,] SurfacePressureXY => Meteorology.SurfacePressureXY;
@@ -94,6 +98,9 @@ public class DomainManager
     { get; protected set; }
     
     public double[,,] BoxHeightXYP // m
+    { get; protected set; }
+    
+    public double[,,] BoxMidXYP // m
     { get; protected set; }
     
     public double[,,] WaterSaturationPressure // Pa
@@ -234,6 +241,9 @@ public class DomainManager
             WaterSaturationPressure = new double[NLevels, NY, NX];
             BoxEdgeAltitudeXYPe = new double[NLevels + 1, NY, NX];
             BruntVaisalaXYP = new double[NLevels, NY, NX];
+            VerticalXShearXYP = new double[NLevels, NY, NX];
+            VerticalYShearXYP = new double[NLevels, NY, NX];
+            BoxMidXYP = new double[NLevels, NY, NX];
         }
 
         // Store the met manager for future reference
@@ -307,36 +317,51 @@ public class DomainManager
         }
 
         // Update the box heights
-        // TODO: Avoid if not needed
-        if (!BoxHeightsNeeded)
+        if (BoxHeightsNeeded)
         {
-            Stopwatches["Derived quantities"].Stop();
-            return;
-        }
-        double oneMinusH2OPerAir = 1.0 - (Physics.WaterMolarMass / Physics.AirMolarMass);
-        // Convenient factor - gas constant in dry air divided by g
-        double rdg0 = Physics.RGasUniversal / (Physics.AirMolarMass * Physics.G0);
-        for (int i = 0; i < NX; i++)
-        {
-            for (int j = 0; j < NY; j++)
+            double oneMinusH2OPerAir = 1.0 - (Physics.WaterMolarMass / Physics.AirMolarMass);
+            // Convenient factor - gas constant in dry air divided by g
+            double rdg0 = Physics.RGasUniversal / (Physics.AirMolarMass * Physics.G0);
+            for (int i = 0; i < NX; i++)
             {
-                BoxEdgeAltitudeXYPe[0, j, i] = 0.0;
-                for (int k = 0; k < NLevels; k++)
+                for (int j = 0; j < NY; j++)
                 {
-                    double localT = TemperatureXYP[k, j, i];
-                    double localSpecificHumidity = SpecificHumidityXYP[k, j, i];
-                    double upperP = PressureEdgeXYPe[k + 1, j, i];
-                    double lowerP = PressureEdgeXYPe[k, j, i];
-                    //WaterSaturationPressure[k, j, i] = Physics.SaturationPressureLiquid(localT);
-                    //double pressureMidpoint = 0.5 * (upperP + lowerP);
-                    double waterVolumetricMixingRatio = Physics.WaterMolarConversion * localSpecificHumidity /
-                                      (1.0 - localSpecificHumidity);
-                    double waterMolFraction = waterVolumetricMixingRatio / (1.0 + waterVolumetricMixingRatio);
-                    //double potentialTemperature = localT * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
-                    double virtualTemperature = localT / (1.0 - waterMolFraction * oneMinusH2OPerAir);
-                    double boxHeight = rdg0 * virtualTemperature * Math.Log(lowerP / upperP);
-                    BoxHeightXYP[k, j, i] = boxHeight;
-                    BoxEdgeAltitudeXYPe[k + 1, j, i] = BoxEdgeAltitudeXYPe[k, j, i] + boxHeight;
+                    BoxEdgeAltitudeXYPe[0, j, i] = 0.0;
+                    // Initialize to represent surface
+                    double zMid = 0.0;
+                    double uMid = 0.0;
+                    double vMid = 0.0;
+                    for (int k = 0; k < NLevels; k++)
+                    {
+                        double localT = TemperatureXYP[k, j, i];
+                        double localSpecificHumidity = SpecificHumidityXYP[k, j, i];
+                        double upperP = PressureEdgeXYPe[k + 1, j, i];
+                        double lowerP = PressureEdgeXYPe[k, j, i];
+                        //WaterSaturationPressure[k, j, i] = Physics.SaturationPressureLiquid(localT);
+                        //double pressureMidpoint = 0.5 * (upperP + lowerP);
+                        double waterVolumetricMixingRatio = Physics.WaterMolarConversion * localSpecificHumidity /
+                                                            (1.0 - localSpecificHumidity);
+                        double waterMolFraction = waterVolumetricMixingRatio / (1.0 + waterVolumetricMixingRatio);
+                        //double potentialTemperature = localT * Math.Pow(1.0e5 / pressureMidpoint, 0.286);
+                        double virtualTemperature = localT / (1.0 - waterMolFraction * oneMinusH2OPerAir);
+                        double boxHeight = rdg0 * virtualTemperature * Math.Log(lowerP / upperP);
+                        BoxHeightXYP[k, j, i] = boxHeight;
+                        BoxEdgeAltitudeXYPe[k + 1, j, i] = BoxEdgeAltitudeXYPe[k, j, i] + boxHeight;
+                        // Transfer old values to this layer
+                        double zMidBelow = zMid;
+                        double uBelow = uMid;
+                        double vBelow = vMid;
+                        // Update based on local information
+                        zMid = (boxHeight / 2.0) + BoxEdgeAltitudeXYPe[k,j,i];
+                        uMid = XSpeedXYP[k, j, i];
+                        vMid = YSpeedXYP[k, j, i];
+                        // This is technically the shear from mid-way through the cell underneath up to the mid point
+                        // of this cell
+                        VerticalXShearXYP[k, j, i] = (uMid - uBelow) / (zMid - zMidBelow);
+                        VerticalYShearXYP[k, j, i] = (vMid - vBelow) / (zMid - zMidBelow);
+                        // Store for later reference
+                        BoxMidXYP[k, j, i] = zMid;
+                    }
                 }
             }
         }

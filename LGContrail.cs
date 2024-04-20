@@ -496,11 +496,16 @@ public class LGContrail : LGPointConnected
         double newVolume = previousVolume * densityRatio;
         double oldArea = CrossSectionArea;
         CrossSectionArea = newVolume / Segment.SegmentLength;
-        
+
+        SimpleContrailDiffusionModel(dt, oldAmbientSpecificHumidity);
+    }
+
+    private readonly double SimpleGrowthConstant = 3600.0 / Math.Log(1.0 + 0.10); 
+    private void SimpleContrailDiffusionModel(double dt, double oldAmbientSpecificHumidity)
+    {
         // Mix in new air at the ambient humidity of the target location
         // Very, very simple mixing; assume a 10% increase in air mass per hour, and that the additional air is ambient
-        double growthConstant = 3600.0 / Math.Log(1.0 + 0.10);
-        double growthFactor = Math.Exp(dt / growthConstant); // Factor increase in air mass due to "mixing"
+        double growthFactor = Math.Exp(dt / SimpleGrowthConstant); // Factor increase in air mass due to "mixing"
         // How much additional water will be brought in?
         double meanAmbientSpecificHumidity = 0.5 * (AmbientSpecificHumidity + oldAmbientSpecificHumidity);
         double newWater = meanAmbientSpecificHumidity * (growthFactor - 1.0) * AirMass;
@@ -517,9 +522,7 @@ public class LGContrail : LGPointConnected
         }
         // Grow/shrink crystals accordingly - assumes monodisperse
         CrystalRadius = Math.Cbrt(0.75 * availableIce / (Math.PI * CrystalCount));
-        // TODO: Incorporate simple diffusion and mixing
-        // TODO: Incorporate ice crystal microphysics
-    } 
+    }
 
     public bool ContrailLive()
     {
