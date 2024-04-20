@@ -1,4 +1,5 @@
 using System.Reflection.PortableExecutable;
+using System.Runtime.CompilerServices;
 using MathNet.Numerics;
 
 namespace LGTracer;
@@ -256,6 +257,12 @@ public class LGContrail : LGPointConnected
         return thresholdTemperature - offsetTemperature;
     }
 
+    private static double EstimateDPSatIceByDT(double temperature, double dT = 2.0e-10)
+    {
+        return (Physics.SaturationPressureIce(temperature + dT / 2.0) -
+                Physics.SaturationPressureIce(temperature - dT / 2.0)) / dT;
+    }
+    
     private static double EstimateDPSatByDT(double temperature, double dT = 2.0e-10)
     {
         return (Physics.SaturationPressureLiquid(temperature + dT / 2.0) -
@@ -577,5 +584,77 @@ public class LGContrail : LGPointConnected
         {
             return base.GetProperty(property);
         }
+    }
+    
+    // Functions for Unterstrasser 2016 (https://acp.copernicus.org/articles/16/2059/2016/)
+    private static double VortexDisplacementLength(double circulation, double bruntVaisalaFrequency)
+    {
+        // Returns z_desc
+        return Math.Sqrt(circulation * 8.0 / (Math.PI * bruntVaisalaFrequency));
+    }
+    
+    private static double AtmosphericSaturationLength(double temperature, double relativeHumidityIce, double dryLapseRate=9.8e-3)
+    {
+        // Temperature in K, relativeHumidityIce in fraction
+        // Dry lapse rate is in K/m
+        // Returns z_atm
+        double errorThreshold = 1.0e-6;
+        double leftHandSide = relativeHumidityIce * Physics.SaturationPressureIce(temperature) / temperature;
+        double zAtm = 1000.0 * Double.Max(0.0, relativeHumidityIce - 1.0);
+        double temperatureOffset = temperature + dryLapseRate * zAtm;
+        double pSatOffset = Physics.SaturationPressureIce(temperatureOffset);
+        double f = leftHandSide - (pSatOffset / temperatureOffset);
+        int nAttempts = 0;
+        int nMax = 100;
+        while (Math.Abs(f) > errorThreshold)
+        {
+            if (nAttempts > nMax)
+            {
+                throw new NonConvergenceException("Failed to converge on value for atmospheric length scale in contrail formation.");
+            }
+            double fPrime = (dryLapseRate / (temperatureOffset * temperatureOffset)) *
+                             (pSatOffset - temperatureOffset * EstimateDPSatIceByDT(temperatureOffset));
+            zAtm -= f / fPrime;
+            // Update derived quantities
+            temperatureOffset = temperature + dryLapseRate * zAtm;
+            pSatOffset = Physics.SaturationPressureIce(temperatureOffset);
+            f = leftHandSide - (pSatOffset / temperatureOffset);
+            nAttempts++;
+        }
+        return zAtm;
+    }
+
+    private const double WaterGasConstant = 461.0; // J/kg/k for water vapour
+    private static double PlumeSaturationLength(double temperature, double plumeArea, double waterEmissionRate, double dryLapseRate=9.8e-3)
+    {
+        // Temperature in K, wing span in m, water emission rate in kg/m
+        // Dry lapse rate is in K/m
+        // Returns z_emit
+        double errorThreshold = 1.0e-8;
+        double waterPerUnitArea = waterEmissionRate / plumeArea;
+        double leftHandSide = (Physics.SaturationPressureIce(temperature) / (temperature * WaterGasConstant)) +
+                              waterPerUnitArea;
+        double zEmit = 100.0;
+        double temperatureOffset = temperature + dryLapseRate * zEmit;
+        double pSatOffset = Physics.SaturationPressureIce(temperatureOffset);
+        double f = leftHandSide - (pSatOffset / (WaterGasConstant * temperatureOffset));
+        int nAttempts = 0;
+        int nMax = 100;
+        while (Math.Abs(f) > errorThreshold)
+        {
+            if (nAttempts > nMax)
+            {
+                throw new NonConvergenceException("Failed to converge on value for plume water length scale in contrail formation.");
+            }
+            double fPrime = (dryLapseRate / (WaterGasConstant * temperatureOffset * temperatureOffset)) *
+                            (pSatOffset - temperatureOffset * EstimateDPSatIceByDT(temperatureOffset));
+            zEmit -= f / fPrime;
+            // Update derived quantities
+            temperatureOffset = temperature + dryLapseRate * zEmit;
+            pSatOffset = Physics.SaturationPressureIce(temperatureOffset);
+            f = leftHandSide - (pSatOffset / (WaterGasConstant * temperatureOffset));
+            nAttempts++;
+        }
+        return zEmit;
     }
 }

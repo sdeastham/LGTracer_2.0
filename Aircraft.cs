@@ -8,6 +8,7 @@ public interface IAircraft
     public double FlightSpeed();
     public double WaterEmissionsPerMeter();
     public double NonVolatileNumberEmissionsPerMeter(); // Particles per second
+    public double PlumeArea();
 }
 
 public class Aircraft : IAircraft
@@ -80,6 +81,13 @@ public class Aircraft : IAircraft
     {
         return FuelFlowRate() * NonVolatileNumberEmissionsIndex / FlightSpeed();
     }
+    
+    public double PlumeArea()
+    {
+        // Equations A6 and A7 of Unterstrasser 2016
+        double plumeRadius = 1.5 + 0.314 * Wingspan;
+        return 4.0 * Math.PI * plumeRadius * plumeRadius;
+    }
 }
 
 public class SimpleAircraft : IAircraft
@@ -124,5 +132,12 @@ public class SimpleAircraft : IAircraft
     public double NonVolatileNumberEmissionsPerMeter()
     {
         return FuelFlowRate() * NonVolatileNumberEmissionsIndex;
+    }
+    
+    public double PlumeArea()
+    {
+        // Equations A6 and A7 of Unterstrasser 2016
+        double plumeRadius = 1.5 + 0.314 * Wingspan;
+        return 4.0 * Math.PI * plumeRadius * plumeRadius;
     }
 }
