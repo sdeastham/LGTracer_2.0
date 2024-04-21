@@ -257,6 +257,7 @@ public class PointManagerFlight : PointManager
                 string destination = fields[destinationIndex];
                 Airport originAirport = airports[origin];
                 Airport destinationAirport = airports[destination];
+                IAircraft equipment = AircraftFactory.CreateAircraftU2016(fields[equipmentIndex],simpleDefault: false);
                 if (originAirport == destinationAirport)
                 {
                     continue;
@@ -292,7 +293,7 @@ public class PointManagerFlight : PointManager
                     if ((cullByStart && currentDate < startCutoff) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
                     bool flightOK = SimulateFlight(originAirport.Longitude, originAirport.Latitude,
                         destinationAirport.Longitude, destinationAirport.Latitude,
-                        currentDate, 820.0, null, PointPeriod);
+                        currentDate, 820.0, null, PointPeriod, equipment: equipment);
                     if (flightOK)
                     {
                         nFlights++;
