@@ -1,7 +1,7 @@
 ﻿---
 timing:
   start-date: "2023-01-01 00:00:00"
-  end-date: "2023-01-02 00:00:00"
+  end-date: "2023-01-05 00:00:00"
 timesteps:
   # Simulation heartbeat (seconds)
   simulation: 300.0
@@ -46,8 +46,8 @@ points-flights:
   include-settling: true
   # Complex contrails incur more computational cost
   complex-contrails: false
-  skip-newton-iteration-for-tlm: true
-  use-ponater-tlc: false
+  skip-newton-iteration-for-tlm: false
+  use-ponater-tlc: true
   point-spacing: 300.0
   # To ensure ongoing location collection - in hours
   minimum-lifetime: 3.0
@@ -62,7 +62,7 @@ input-output:
   met-directory: "C:/Data/MERRA-2"
   output-directory: "C:/Data/LGTracer/output"
   input-directory: "C:/Data/LGTracer/input"
-  serial-met-data: true
+  serial-met-data: false
 # Use null for the default (system clock)
 seed: 481301
 # Update meteorology over time?

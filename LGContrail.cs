@@ -83,6 +83,25 @@ public class LGContrail : LGPointConnected
         double dpdtSettling = dzdtSettling * Physics.G0 * -1.0 * AirDensity;
         return (dxdt, dydt, dpdt + dpdtSettling);
     }
+
+    public void InitiateContrail(IAircraft? equipment)
+    {
+        if (equipment == null)
+        {
+            InitiateContrail(0.35, 1.0e14, 1.0, 265.0, 0.7,
+                waterVapourEmissionsIndex: 1.223, lowerHeatingValue: 43.2e6);
+            return;
+        }
+        // Try to get information from the equipment instead
+        double efficiency = equipment.OverallEfficiency();
+        double airSpeed = equipment.FlightSpeed();
+        double metersPerKgFuel = airSpeed / equipment.FuelFlowRate();
+        double numberEmissionsIndex = equipment.NonVolatileNumberEmissionsPerMeter() * metersPerKgFuel;
+        double waterVapourEmissionsIndex = equipment.WaterEmissionsPerMeter() * metersPerKgFuel;
+        double activationFraction = 1.0;
+        InitiateContrail(efficiency, numberEmissionsIndex, activationFraction, airSpeed, equipment.FuelFlowRate(),
+            waterVapourEmissionsIndex, lowerHeatingValue: 43.2e6);
+    }
     
     public void InitiateContrail(double efficiency, double numberEmissionsIndex, double activationFraction,
         double airSpeed, double fuelFlowRate, double waterVapourEmissionsIndex=1.223, double lowerHeatingValue = 43.2e6)

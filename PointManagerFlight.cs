@@ -30,13 +30,6 @@ public class PointManagerFlight : PointManager
         MinimumPointLifetime = configSubOptions.MinimumLifetime;
         SkipNewtonIterationForTlm = configSubOptions.SkipNewtonIterationForTlm;
         UsePonaterTlc = configSubOptions.UsePonaterTlc;
-        // Run contrail test suite
-        /*
-        if (ContrailSimulation && !LGContrail.TestSAC(true))
-        {
-            throw new InvalidOperationException("Failed contrail test suite!");
-        }
-        */
         AirportNameField = configSubOptions.UseIcao ? "ICAO" : "IATA";
     }
 
@@ -53,6 +46,7 @@ public class PointManagerFlight : PointManager
         // Crude flight simulation between two airports. Currently only handles cruise
         double cruiseAltitude = RandomNumberGenerator == null ? 10.0 : 9.0 + RandomNumberGenerator.NextDouble() * (12.0 - 9.0);
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
+        equipment?.InitializeFlight(flightDistance, loadFactor: 0.8);
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
         return AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
                [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod, equipment);
@@ -120,8 +114,6 @@ public class PointManagerFlight : PointManager
         LGContrail point = (LGContrail)base.NextPoint(x, y, pressure);
         point.Temperature = Domain.NearestNeighbor3D(x,y,pressure,Domain.TemperatureXYP);
         point.AmbientSpecificHumidity = Domain.NearestNeighbor3D(x,y,pressure,Domain.SpecificHumidityXYP); 
-        point.InitiateContrail(0.35, 1.0e14, 1.0, 265.0, 0.7,
-            waterVapourEmissionsIndex: 1.223, lowerHeatingValue: 43.2e6);
         return point;
     }
 
@@ -143,8 +135,13 @@ public class PointManagerFlight : PointManager
                 FlightSegment.Waypoint[] seedVector = flightSegment.DeploySeeds(LastSeedTime, endTime);
                 foreach (FlightSegment.Waypoint seed in seedVector)
                 {
+                    flight.Advance(seed.SegmentTime);
                     if (!Domain.InDomainXYP(seed.Lon, seed.Lat, seed.Pressure)) { continue; }
                     LGPointConnected newPoint = (LGPointConnected)NextPoint(seed.Lon, seed.Lat, seed.Pressure);
+                    if (ContrailSimulation)
+                    {
+                        ((LGContrail)newPoint).InitiateContrail(flight.Equipment);
+                    }
                     newPoint.Connect(flight.LastPoint, null, flightLabel, flight.ClearPoint);
                     flight.UpdateLast(newPoint);
                 }
@@ -330,7 +327,7 @@ public class PointManagerFlight : PointManager
         private double[] WaypointAltitudes;
         private DateTime[] WaypointTimes;
         private string FlightLabel;
-        private IAircraft? Equipment;
+        public IAircraft? Equipment { get; protected set; }
         private double PointPeriod;
 
         public Flight(DateTime[] waypointTimes, double[] lons, double[] lats, double[] pressureAltitudes,
@@ -385,6 +382,11 @@ public class PointManagerFlight : PointManager
             {
                 LastPoint = null;
             }
+        }
+
+        public void Advance(double dt)
+        {
+            Equipment?.Advance(dt);
         }
     }
 }
@@ -444,10 +446,12 @@ public class FlightSegment
         waypointTimes[nWaypoints - 1] = EndDateTime;
 
         Waypoints = [];
+        double segmentTime = 0.0; // Time in seconds between this waypoint and the previous one
         for (int iWaypoint = 0; iWaypoint < nWaypoints; iWaypoint++)
         {
             Waypoints.AddLast(new Waypoint(waypointLons[iWaypoint], waypointLats[iWaypoint], cruisePressurePa,
-                waypointTimes[iWaypoint]));
+                waypointTimes[iWaypoint], segmentTime));
+            segmentTime = pointPeriod;
         }
     }
 
@@ -455,16 +459,19 @@ public class FlightSegment
     {
         // Delete seeds which should already have been deployed
         LinkedListNode<Waypoint>? node = Waypoints.First;
+        double totalTimeSkipped = 0.0;
         while (node != null)
         {
             LinkedListNode<Waypoint>? nextNode = node.Next;
             Waypoint waypoint = node.Value;
             if (waypoint.Deploy(now))
             {
+                totalTimeSkipped += node.Value.SegmentTime;
                 Waypoints.Remove(node);
             }
             node = nextNode;
         }
+        Equipment?.Advance(totalTimeSkipped);
     }
 
     public Waypoint[] DeploySeeds(DateTime startTime, DateTime endTime)
@@ -488,12 +495,13 @@ public class FlightSegment
     }
 
     // Nested class because no-one else needs this
-    public class Waypoint(double lon, double lat, double pressure, DateTime deploymentTime)
+    public class Waypoint(double lon, double lat, double pressure, DateTime deploymentTime, double segmentTime)
     {
         public double Lon = lon;
         public double Lat = lat;
         public double Pressure = pressure;
         public DateTime DeploymentTime = deploymentTime;
+        public double SegmentTime = segmentTime;
 
         public bool Deploy(DateTime now)
         {

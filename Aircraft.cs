@@ -7,8 +7,17 @@ public interface IAircraft
     public double InitialWakeCirculation(double airDensity);
     public double FlightSpeed();
     public double WaterEmissionsPerMeter();
+    public double FuelFlowRate();
     public double NonVolatileNumberEmissionsPerMeter(); // Particles per second
     public double PlumeArea();
+    public double OverallEfficiency()
+    {
+        return 0.35;
+    }
+    public void InitializeFlight(double distance, double loadFactor)
+    {
+        // Default to doing nothing
+    }
 }
 
 public static class AircraftFactory
@@ -217,7 +226,7 @@ public class Aircraft : IAircraft
         return PhysConstants.G0 * CurrentMass / (airDensity * InitialVortexSeparation * FlightSpeed());
     }
 
-    private double FuelFlowRate()
+    public double FuelFlowRate()
     {
         return CruiseFuelFlowRate;
     }
@@ -268,21 +277,21 @@ public class Aircraft : IAircraft
         double finalWeight = EmptyMass + ReserveFuelMass + PayloadMass;
         // Based on inverting the Breguet range equation again
         double fractionalChange =
-            (Math.Exp(PerformanceFactor * fuelLowerHeatingValue / (PhysConstants.G0 * distance * 1.0e3)) - 1.0);
+            (Math.Exp(PhysConstants.G0 * distance * 1.0e3 / (PerformanceFactor * fuelLowerHeatingValue)) - 1.0);
         return finalWeight * fractionalChange;
     }
 
-    public void InitializeByDistance(double distance, double loadFactor, double fuelMargin=0.1)
+    private void InitializeByDistance(double distance, double loadFactor, double fuelMargin)
     {
         PayloadMass = loadFactor * MaximumPayloadMass;
         FuelMass = ReserveFuelMass + (1.0 + fuelMargin) * EstimateFuelRequirement(distance);
         if (CurrentMass > MaximumTakeoffMass)
         {
-            throw new ArgumentOutOfRangeException(nameof(distance),"Takeoff mass exceeds maximum take off mass.");
+            throw new ArgumentOutOfRangeException(nameof(distance),$"Takeoff mass ({CurrentMass*1.0e-3:f2} tonnes) exceeds maximum take-off mass ({MaximumTakeoffMass*1.0e-3:f2} tonnes).");
         }
     }
     
-    public void InitializeByFuelMass(double fuelMass, double loadFactor)
+    private void InitializeByFuelMass(double fuelMass, double loadFactor)
     {
         PayloadMass = loadFactor * MaximumPayloadMass;
         FuelMass = fuelMass;
@@ -290,6 +299,12 @@ public class Aircraft : IAircraft
         {
             throw new ArgumentOutOfRangeException(nameof(fuelMass),"Takeoff mass exceeds maximum take off mass.");
         }
+    }
+    
+    // Use "initialize by distance" by default
+    public void InitializeFlight(double distance, double loadFactor=0.8)
+    {
+        InitializeByDistance(distance, loadFactor, fuelMargin: 0.05);
     }
 }
 
@@ -316,7 +331,7 @@ public class SimpleAircraft : IAircraft
         // Null - nothing to advance
     }
 
-    private double FuelFlowRate()
+    public double FuelFlowRate()
     {
         return WaterEmissionsPerMeter() / 1.233;
     }
