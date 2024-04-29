@@ -66,8 +66,11 @@ public abstract class LGOptionsPoints
 {
     public long? Max = 0;
     public bool AdiabaticCompression = true;
-    public string OutputFilename = "default_output.nc";
+    public bool WritePeriodic = true;
+    public string OutputFilename = "default_output_{date}.nc";
     public string[] OutputVariables = [];
+    public bool WriteTrajectories = false;
+    public string TrajectoryFilename = "default_trajectory_{date}_{uid}.nc";
 
     public bool Active => (Max == null || Max > 0);
 }

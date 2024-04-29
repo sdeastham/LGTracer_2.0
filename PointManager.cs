@@ -64,10 +64,16 @@ public abstract class PointManager
     // Do we calculate the effect of compression on temperature?
     protected bool IncludeCompression;
 
+    public bool WriteOutput
+    { get; private set; }
     public string OutputFilename
     { get; private set; }
-    
     public string OutputDirectory
+    { get; private set; }
+    
+    public bool WriteTrajectories
+    { get; private set; }
+    public string TrajectoryFilename
     { get; private set; }
 
     private DateTime StorageStartTime;
@@ -85,8 +91,11 @@ public abstract class PointManager
         IncludeCompression = configSubOptions.AdiabaticCompression;
 
         // Where to output data
+        WriteOutput = configSubOptions.WritePeriodic; // Output data on all points to netCDF files periodically
         OutputDirectory = configOptions.InputOutput.OutputDirectory;
-        OutputFilename = configSubOptions.OutputFilename;
+        OutputFilename = configSubOptions.OutputFilename; // Must contain {date} to prevent overwrites
+        WriteTrajectories = configSubOptions.WriteTrajectories; // Each point writes trajectory to unique parquet file
+        TrajectoryFilename = configSubOptions.TrajectoryFilename; // Must contain {date} and {uid} to prevent overwrites
         
         // The start of the current storage period
         StorageStartTime = configOptions.Timing.StartDate;
