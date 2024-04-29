@@ -124,10 +124,6 @@ public class Program
         if (configOptions.PointsFlights.Active)
         {
             Random pmRNG = GetNextRNG(masterRNG, seedsUsed);
-            string outputFileName = Path.Join(configOptions.InputOutput.OutputDirectory,
-                configOptions.PointsFlights.OutputFilename);
-            // TODO: Just pass configOptions.PointsFlights to the point manager!
-            double pointPeriod = configOptions.PointsFlights.PointSpacing;
             PointManagerFlight pointManager = new PointManagerFlight(domainManager, configOptions, configOptions.PointsFlights, pmRNG);
 
             if (configOptions.PointsFlights.ScheduleFilename != null)

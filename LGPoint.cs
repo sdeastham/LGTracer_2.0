@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.Intrinsics.X86;
+using Parquet.Serialization;
 
 namespace LGTracer;
 
@@ -184,6 +185,8 @@ public class LGPoint : IAdvected
 
     private void WriteHistory()
     {
-        Console.WriteLine($"Writing point information to {Filename}");
+        //Console.WriteLine($"Writing point information to {Filename}");
+        // Start lazy..
+        ParquetSerializer.SerializeAsync(History, Filename);
     }
 }

@@ -202,7 +202,7 @@ public abstract class PointManager
 
         // Give the point its location and a new UID
         // Requesting the UID will automatically increment it
-        point.Activate(x,y,pressure,NextUID,CurrentTime,TrajectoryFilename);
+        point.Activate(x,y,pressure,NextUID,CurrentTime,Path.Join(OutputDirectory,TrajectoryFilename));
         NInactive--;
         NActive++;
         return point;
