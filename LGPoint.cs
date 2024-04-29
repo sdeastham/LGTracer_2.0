@@ -1,6 +1,11 @@
 using System.Numerics;
 using System.Runtime.Intrinsics.X86;
+using Apache.Arrow;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
 using Parquet.Serialization;
+using Field = Parquet.Schema.Field;
 
 namespace LGTracer;
 
@@ -183,10 +188,39 @@ public class LGPoint : IAdvected
         }
     }
 
-    private void WriteHistory()
+    private ParquetSchema? Schema = null;
+    private async void WriteHistory()
     {
         //Console.WriteLine($"Writing point information to {Filename}");
         // Start lazy..
-        ParquetSerializer.SerializeAsync(History, Filename);
+        //ParquetSerializer.SerializeAsync(History, Filename);
+        if (Schema == null)
+        {
+            // Only define this once
+            Field[] dataFields = new Field[History.Count];
+            int iField = 0;
+            foreach (string property in History.Keys)
+            {
+                dataFields[iField] = new DataField<double>(property); 
+                iField++;
+            }
+            Schema = new ParquetSchema(dataFields);
+        }
+        using (Stream fs = System.IO.File.OpenWrite(Filename))
+        {
+            using (ParquetWriter writer = await ParquetWriter.CreateAsync(Schema,fs))
+            {
+                using (ParquetRowGroupWriter groupWriter = writer.CreateRowGroup())
+                {
+                    int iColumn = 0;
+                    foreach (string property in History.Keys)
+                    {
+                        var column = new DataColumn(Schema.DataFields[iColumn], History[property].ToArray());
+                        await groupWriter.WriteColumnAsync(column);
+                        iColumn++;
+                    }
+                }
+            }
+        }
     }
 }
