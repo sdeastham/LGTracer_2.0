@@ -35,9 +35,9 @@ public class LGAirMass : LGPoint
         SpecificHumidity = double.NaN;
     }
 
-    public override void Activate( double x, double y, double pressure, uint uniqueID )
+    public override void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate, string? filename )
     {
-        base.Activate( x,y,pressure,uniqueID );
+        base.Activate( x,y,pressure,uniqueID,initiationDate,filename );
         Temperature = double.NaN;
         SpecificHumidity = double.NaN;
     }
@@ -58,7 +58,7 @@ public class LGAirMass : LGPoint
             case "rhi":
                 return RelativeHumidityIce;
             default:
-                throw new ArgumentException($"No property for LGAirMass called {property}");
+                return base.GetProperty(property);
         }
     }
 

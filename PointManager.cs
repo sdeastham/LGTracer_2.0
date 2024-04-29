@@ -78,6 +78,8 @@ public abstract class PointManager
 
     private DateTime StorageStartTime;
 
+    private DateTime CurrentTime;
+
     public PointManager(DomainManager domain, LGOptions configOptions, LGOptionsPoints configSubOptions)
     {
         // UIDs start from 1 (0 reserved for inactive points)
@@ -99,6 +101,7 @@ public abstract class PointManager
         
         // The start of the current storage period
         StorageStartTime = configOptions.Timing.StartDate;
+        CurrentTime = configOptions.Timing.StartDate;
             
         // Limit on how many points can be managed
         if (maxPoints == null)
@@ -179,6 +182,11 @@ public abstract class PointManager
         IAdvected point = CreatePoint();
         InactivePoints.AddLast(point);
         NInactive++;
+        if (WriteTrajectories)
+        {
+            // Tell the point what data it will need to archive
+            point.SetupHistory(PropertyNames);
+        }
         // Activate a point (doesn't matter if it's the same one) and return it
         return ActivatePoint(x,y,pressure);
     }
@@ -194,7 +202,7 @@ public abstract class PointManager
 
         // Give the point its location and a new UID
         // Requesting the UID will automatically increment it
-        point.Activate(x,y,pressure,NextUID);
+        point.Activate(x,y,pressure,NextUID,CurrentTime,TrajectoryFilename);
         NInactive--;
         NActive++;
         return point;
@@ -253,6 +261,7 @@ public abstract class PointManager
         {
             point.Advance(dt, Domain);
         }
+        CurrentTime += TimeSpan.FromSeconds(dt);
     }
 
     public virtual void Cull()
@@ -420,12 +429,11 @@ public abstract class PointManager
                 properties[k][i] = point.GetProperty(property);
                 k++;
             }
-            /*
-             for (int k = 0; k < nProperties; k++)
+
+            if (WriteTrajectories)
             {
-                properties[k][i] = point.GetProperty(PropertyNames[k]);
+                point.ArchiveConditions();
             }
-            */
             i++;
         }
         TimeHistory.Add(tCurr);

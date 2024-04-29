@@ -255,6 +255,15 @@ public class Program
             }
         }
         
+        // At simulation end, deactivate all points to force writes if trajectories are in use
+        foreach (PointManager pm in pointManagers)
+        {
+            foreach (IAdvected point in pm.ActivePoints)
+            {
+                point.Deactivate();
+            }
+        }
+        
         watch.Stop();
         long elapsedTimeLong = watch.ElapsedMilliseconds;
         double elapsedTime = (double)elapsedTimeLong;

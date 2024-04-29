@@ -31,7 +31,7 @@ points-flights:
   adiabatic-compression: true
   output-filename: flight-waypoints-{date}.nc
   write-trajectories: true
-  trajectory-filename: trajectory-{date}-{uid}.nc
+  trajectory-filename: trajectory-{date}-{uid}.parquet
   output-variables: ["segment_length",
                      "segment_stretch",
                      "segment_tail_x",

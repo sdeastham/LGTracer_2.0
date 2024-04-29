@@ -56,7 +56,14 @@ public class LGPoint : IAdvected
         return UID;
     }
 
+    // Facilitates some slightly screwy logic for points which can become invalid (classes inheriting from this one)
     protected bool DefaultValidity;
+
+    public Dictionary<string, List<double>> History
+    { get; protected set; }
+
+    private DateTime InitiationDate;
+    private string Filename;
 
     public LGPoint( Func<double, double, double, (double, double, double)> vCalc)
     {
@@ -65,11 +72,12 @@ public class LGPoint : IAdvected
         InitialLocation = new Vector3(float.NaN,float.NaN,float.NaN);
         VelocityCalc = vCalc;
         DefaultValidity = true;
+        History = [];
         // Set the rest of the properties by deactivating the point
         Deactivate();
     }
 
-    public virtual void Activate( double x, double y, double pressure, uint uniqueID )
+    public virtual void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate, string? filename )
     {
         // Change the particle from being inactive to active
         Active = true;
@@ -78,6 +86,10 @@ public class LGPoint : IAdvected
         InitialLocation = new Vector3((float)x, (float)y, (float)pressure);
         UID = uniqueID;
         Age = 0.0;
+        Filename = (filename != null) ? filename.Replace("{date}", initiationDate.ToString("yyyyMMddTHHmmss"))
+                .Replace("{uid}", $"{uniqueID:D10}") : "unused";
+        InitiationDate = initiationDate;
+        ArchiveConditions();
     }
 
     public virtual void Deactivate()
@@ -87,11 +99,38 @@ public class LGPoint : IAdvected
         _location = new Vector3(float.NaN,float.NaN,float.NaN);
         UID = 0;
         Age = double.NaN;
+        // Write history to file if requested
+        if (History.Count <= 0) return; // No properties
+        if (History["age"].Count <= 1) return; // Only the activation point
+        if (Math.Abs(History["age"].Last() - Age) > 1.0e-3) { ArchiveConditions(); } // Add the location at "death"
+        WriteHistory();
+        // Clear history again
+        foreach (string property in History.Keys)
+        {
+            History[property].Clear();
+        }
     }
 
     public virtual double GetProperty(string property)
     {
-        throw new ArgumentException($"Property {property} requested but base LGPoints have no properties");
+        switch (property.ToLower().Replace("_",""))
+        {
+            case "longitude":
+            case "lon":
+            case "x":
+                return X;
+            case "latitude":
+            case "lat":
+            case "y":
+                return Y;
+            case "pressure":
+            case "p":
+                return Pressure;
+            case "age":
+                return Age;
+            default:
+                throw new ArgumentException($"No property for LGPoint called {property}");
+        }
     }
 
     public virtual void Advance( double dt, DomainManager domain )
@@ -118,5 +157,33 @@ public class LGPoint : IAdvected
     public virtual bool CheckValid()
     {
         return DefaultValidity;
+    }
+
+    public void SetupHistory(IEnumerable<string> propertyNames)
+    {
+        // First add the default properties
+        foreach (string property in (string[])["longitude","latitude","pressure","age"])
+        {
+            History.Add(property, []);
+        }
+        // Now the non-default ones
+        foreach (string property in propertyNames.Where(property => !History.ContainsKey(property)))
+        {
+            History.Add(property, []);
+        }
+    }
+
+    public void ArchiveConditions()
+    {
+        // Store information
+        foreach (string property in History.Keys)
+        {
+            History[property].Add(GetProperty(property));
+        }
+    }
+
+    private void WriteHistory()
+    {
+        Console.WriteLine($"Writing point information to {Filename}");
     }
 }
