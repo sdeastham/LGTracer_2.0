@@ -143,6 +143,12 @@ public class LGContrail : LGPointConnected
         // Subtract ice already on the crystals
         WaterVapourMass -= IceMass;
         LastSettlingVelocity = 0.0;
+        // Clear the history and reinitialize, so that we pick up the initial values
+        foreach (string property in History.Keys)
+        {
+            History[property].Clear();
+        }
+        ArchiveConditions();
     }
 
     private double CalculateCircumference()
