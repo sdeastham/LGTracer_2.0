@@ -283,11 +283,13 @@ public class Aircraft : IAircraft
 
     private void InitializeByDistance(double distance, double loadFactor, double fuelMargin)
     {
+        // Allow MTOW to be exceeded by this factor
+        const double maxExcess = 0.05;
         PayloadMass = loadFactor * MaximumPayloadMass;
         FuelMass = ReserveFuelMass + (1.0 + fuelMargin) * EstimateFuelRequirement(distance);
-        if (CurrentMass > MaximumTakeoffMass)
+        if (CurrentMass > (1.0 + maxExcess) * MaximumTakeoffMass)
         {
-            throw new ArgumentOutOfRangeException(nameof(distance),$"Takeoff mass ({CurrentMass*1.0e-3:f2} tonnes) exceeds maximum take-off mass ({MaximumTakeoffMass*1.0e-3:f2} tonnes).");
+            throw new ArgumentOutOfRangeException(nameof(distance),$"Takeoff mass ({CurrentMass*1.0e-3:f2} tonnes) for a {distance:f2} km flight exceeds maximum take-off mass ({MaximumTakeoffMass*1.0e-3:f2} tonnes).");
         }
     }
     
