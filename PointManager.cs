@@ -3,6 +3,8 @@ using System.Globalization;
 using Microsoft.Research.Science.Data;
 using Microsoft.Research.Science.Data.Imperative;
 using Microsoft.Research.Science.Data.NetCDF4;
+using Parquet;
+using Parquet.Schema;
 
 namespace LGTracer;
 
@@ -47,10 +49,6 @@ public abstract class PointManager
     private List<uint[]> UIDHistory;
 
     private List<double> TimeHistory;
-
-    //private List<List<double[]>> PropertyHistory;
-
-    //private List<string> PropertyNames;
 
     private Dictionary<string, List<double[]>> PropertyHistory;
 
@@ -202,7 +200,7 @@ public abstract class PointManager
 
         // Give the point its location and a new UID
         // Requesting the UID will automatically increment it
-        point.Activate(x,y,pressure,NextUID,CurrentTime,Path.Join(OutputDirectory,TrajectoryFilename));
+        point.Activate(x,y,pressure,NextUID,CurrentTime);
         NInactive--;
         NActive++;
         return point;
@@ -238,11 +236,40 @@ public abstract class PointManager
     {
         // Deactivate point i of those present in ActivePoints
         IAdvected point = node.Value;
+        
+        // Write history to file if requested and the point made it past its first time step
+        if (WriteTrajectories)
+        {
+            Dictionary<string, List<double>> pointHistory = point.GetHistory();
+            if (pointHistory.Count > 0 && pointHistory["age"].Count > 1)
+            {
+                // Add the location at "death" 
+                if (Math.Abs(pointHistory["age"].Last() - point.GetAge()) > 1.0e-3)
+                {
+                    point.ArchiveConditions();
+                }
+                // Add this point's data to the running record
+                //AddTrajectoryToBuffer(point.GetUID(),pointHistory);
+            }
+        }
         point.Deactivate();
         ActivePoints.Remove(node);
         InactivePoints.AddLast(node);
         NInactive++;
         NActive--;
+    }
+
+    public void DeactivateAllPoints()
+    {
+        // Copied from Cull
+        LinkedListNode<IAdvected>? node = ActivePoints.First;
+        // The structure below is necessary because we can't get the next node from a deactivated node
+        while (node != null)
+        {
+            LinkedListNode<IAdvected>? nextNode = node.Next;
+            DeactivatePoint(node);
+            node = nextNode;
+        }
     }
 
     public void CreatePointSet( double[] x, double[] y, double[] pressure )
@@ -393,7 +420,12 @@ public abstract class PointManager
             MaxStoredPoints = 0;
             InitializeHistory();
         }
-            
+
+        if (WriteTrajectories)
+        {
+            WriteTrajectoriesToFile();
+        }
+        
         return fileName;
     }
 
@@ -442,12 +474,6 @@ public abstract class PointManager
         PressureHistory.Add(pressurePoints);
         UIDHistory.Add(UIDs);
         AgeHistory.Add(ages);
-        /*
-        for (int k = 0; k < nProperties; k++)
-        {
-            PropertyHistory[k].Add(properties[k]);
-        }
-        */
         int iProperty = 0;
         foreach (string property in PropertyNames)
         {
@@ -455,11 +481,43 @@ public abstract class PointManager
             iProperty++;
         }
     }
-
-    /*
-    public virtual double GetPromotedProperty(IAdvected point, string property)
+    
+    private ParquetSchema? Schema = null;
+    private async void WriteTrajectoriesToFile()
     {
-        return point.GetProperty(property);
+        //Console.WriteLine($"Writing point information to {Filename}");
+        // Start lazy..
+        //ParquetSerializer.SerializeAsync(History, Filename);
+        /*
+        if (Schema == null)
+        {
+            // Only define this once
+            Field[] dataFields = new Field[History.Count];
+            int iField = 0;
+            foreach (string property in History.Keys)
+            {
+                dataFields[iField] = new DataField<double>(property); 
+                iField++;
+            }
+            Schema = new ParquetSchema(dataFields);
+        }
+        using (Stream fs = System.IO.File.OpenWrite(Filename))
+        {
+            using (ParquetWriter writer = await ParquetWriter.CreateAsync(Schema,fs))
+            {
+                using (ParquetRowGroupWriter groupWriter = writer.CreateRowGroup())
+                {
+                    int iColumn = 0;
+                    foreach (string property in History.Keys)
+                    {
+                        var column = new DataColumn(Schema.DataFields[iColumn], History[property].ToArray());
+                        await groupWriter.WriteColumnAsync(column);
+                        iColumn++;
+                    }
+                }
+            }
+        }
+        // Clear the trajectory history
+        */
     }
-    */
 }

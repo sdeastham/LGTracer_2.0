@@ -47,6 +47,7 @@ public class PointManagerFlight : PointManager
         double cruiseAltitude = RandomNumberGenerator == null ? 10.0 : 9.0 + RandomNumberGenerator.NextDouble() * (12.0 - 9.0);
         double flightDistance = Geodesy.GreatCircleDistance(originLon, originLat, destinationLon, destinationLat);
         equipment?.InitializeFlight(flightDistance, loadFactor: 0.8);
+
         DateTime endTime = takeoffTime + TimeSpan.FromSeconds(3600.0 * flightDistance / cruiseSpeedKPH);
         return AddFlight([originLon, destinationLon], [originLat, destinationLat], [cruiseAltitude, cruiseAltitude],
                [takeoffTime, endTime], flightLabel: flightLabel, pointPeriod: pointPeriod, equipment);
@@ -288,9 +289,20 @@ public class PointManagerFlight : PointManager
                     DateTime currentDate = startDate + TimeSpan.FromDays(iDay);
                     if (!weekdays[(int)currentDate.DayOfWeek]) { continue; }
                     if ((cullByStart && currentDate < startCutoff) || (cullByEnd && currentDate >= simulationEnd)) { continue; }
-                    bool flightOK = SimulateFlight(originAirport.Longitude, originAirport.Latitude,
-                        destinationAirport.Longitude, destinationAirport.Latitude,
-                        currentDate, 820.0, null, PointPeriod, equipment: equipment);
+
+                    bool flightOK;
+                    try
+                    {
+                        flightOK = SimulateFlight(originAirport.Longitude, originAirport.Latitude,
+                            destinationAirport.Longitude, destinationAirport.Latitude,
+                            currentDate, 820.0, null, PointPeriod, equipment: equipment);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Error encountered while simulating flight from {originAirport.NameICAO} to {destinationAirport.NameICAO} using {fields[equipmentIndex]}.");
+                        throw;
+                    }
+
                     if (flightOK)
                     {
                         nFlights++;

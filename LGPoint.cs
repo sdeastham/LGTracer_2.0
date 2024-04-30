@@ -69,7 +69,6 @@ public class LGPoint : IAdvected
     { get; protected set; }
 
     private DateTime InitiationDate;
-    private string Filename;
 
     public LGPoint( Func<double, double, double, (double, double, double)> vCalc)
     {
@@ -83,7 +82,7 @@ public class LGPoint : IAdvected
         Deactivate();
     }
 
-    public virtual void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate, string? filename )
+    public virtual void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate)
     {
         // Change the particle from being inactive to active
         Active = true;
@@ -92,8 +91,6 @@ public class LGPoint : IAdvected
         InitialLocation = new Vector3((float)x, (float)y, (float)pressure);
         UID = uniqueID;
         Age = 0.0;
-        Filename = (filename != null) ? filename.Replace("{date}", initiationDate.ToString("yyyyMMddTHHmmss"))
-                .Replace("{uid}", $"{uniqueID:D10}") : "unused";
         InitiationDate = initiationDate;
         ArchiveConditions();
     }
@@ -105,12 +102,7 @@ public class LGPoint : IAdvected
         _location = new Vector3(float.NaN,float.NaN,float.NaN);
         UID = 0;
         Age = double.NaN;
-        // Write history to file if requested
-        if (History.Count <= 0) return; // No properties
-        if (History["age"].Count <= 1) return; // Only the activation point
-        if (Math.Abs(History["age"].Last() - Age) > 1.0e-3) { ArchiveConditions(); } // Add the location at "death"
-        WriteHistory();
-        // Clear history again
+        // Clear history
         foreach (string property in History.Keys)
         {
             History[property].Clear();
@@ -134,6 +126,8 @@ public class LGPoint : IAdvected
                 return Pressure;
             case "age":
                 return Age;
+            case "uid":
+                return UID;
             default:
                 throw new ArgumentException($"No property for LGPoint called {property}");
         }
@@ -188,39 +182,8 @@ public class LGPoint : IAdvected
         }
     }
 
-    private ParquetSchema? Schema = null;
-    private async void WriteHistory()
+    public Dictionary<string, List<double>> GetHistory()
     {
-        //Console.WriteLine($"Writing point information to {Filename}");
-        // Start lazy..
-        //ParquetSerializer.SerializeAsync(History, Filename);
-        if (Schema == null)
-        {
-            // Only define this once
-            Field[] dataFields = new Field[History.Count];
-            int iField = 0;
-            foreach (string property in History.Keys)
-            {
-                dataFields[iField] = new DataField<double>(property); 
-                iField++;
-            }
-            Schema = new ParquetSchema(dataFields);
-        }
-        using (Stream fs = System.IO.File.OpenWrite(Filename))
-        {
-            using (ParquetWriter writer = await ParquetWriter.CreateAsync(Schema,fs))
-            {
-                using (ParquetRowGroupWriter groupWriter = writer.CreateRowGroup())
-                {
-                    int iColumn = 0;
-                    foreach (string property in History.Keys)
-                    {
-                        var column = new DataColumn(Schema.DataFields[iColumn], History[property].ToArray());
-                        await groupWriter.WriteColumnAsync(column);
-                        iColumn++;
-                    }
-                }
-            }
-        }
+        return History;
     }
 }

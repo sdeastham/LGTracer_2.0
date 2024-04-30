@@ -35,9 +35,9 @@ public class LGAirMass : LGPoint
         SpecificHumidity = double.NaN;
     }
 
-    public override void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate, string? filename )
+    public override void Activate( double x, double y, double pressure, uint uniqueID, DateTime initiationDate )
     {
-        base.Activate( x,y,pressure,uniqueID,initiationDate,filename );
+        base.Activate( x,y,pressure,uniqueID,initiationDate );
         Temperature = double.NaN;
         SpecificHumidity = double.NaN;
     }
