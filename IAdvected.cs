@@ -11,7 +11,7 @@ public interface IAdvected
     public uint GetUID();
     public double GetAge();
     public bool CheckValid();
-    public void ArchiveConditions(); // Append current information to history
+    public void ArchiveConditions(bool clear); // Append current information to history
     public void SetupHistory(IEnumerable<string> propertyNames);
     public Dictionary<string, List<double>> GetHistory();
 }

@@ -246,7 +246,7 @@ public abstract class PointManager
                 // Add the location at "death" 
                 if (Math.Abs(pointHistory["age"].Last() - point.GetAge()) > 1.0e-3)
                 {
-                    point.ArchiveConditions();
+                    point.ArchiveConditions(false);
                 }
                 // Add this point's data to the running record
                 //AddTrajectoryToBuffer(point.GetUID(),pointHistory);
@@ -464,7 +464,7 @@ public abstract class PointManager
 
             if (WriteTrajectories)
             {
-                point.ArchiveConditions();
+                point.ArchiveConditions(false);
             }
             i++;
         }

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.VisualBasic.FileIO; // For parsing CSVs
 using AtmosTools;
 
@@ -145,6 +144,11 @@ public class PointManagerFlight : PointManager
                     }
                     newPoint.Connect(flight.LastPoint, null, flightLabel, flight.ClearPoint);
                     flight.UpdateLast(newPoint);
+                    // Seeding covers all points which occurred since the last seeding time
+                    newPoint.InitiationDate = seed.DeploymentTime;
+                    newPoint.ArchiveConditions(true);
+                    newPoint.Advance((endTime - LastSeedTime).TotalSeconds, Domain);
+                    newPoint.ArchiveConditions(false);
                 }
                 nWaypointsLeft += flightSegment.WaypointsRemaining;
             }

@@ -68,7 +68,7 @@ public class LGPoint : IAdvected
     public Dictionary<string, List<double>> History
     { get; protected set; }
 
-    private DateTime InitiationDate;
+    public DateTime InitiationDate;
 
     public LGPoint( Func<double, double, double, (double, double, double)> vCalc)
     {
@@ -92,7 +92,7 @@ public class LGPoint : IAdvected
         UID = uniqueID;
         Age = 0.0;
         InitiationDate = initiationDate;
-        ArchiveConditions();
+        ArchiveConditions(true);
     }
 
     public virtual void Deactivate()
@@ -173,8 +173,16 @@ public class LGPoint : IAdvected
         }
     }
 
-    public void ArchiveConditions()
+    public void ArchiveConditions(bool clear=false)
     {
+        if (clear)
+        {
+            foreach (string property in History.Keys)
+            {
+                History[property].Clear();
+            }
+        }
+
         // Store information
         foreach (string property in History.Keys)
         {
