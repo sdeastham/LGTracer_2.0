@@ -32,6 +32,7 @@ points-flights:
   output-filename: flight-waypoints-{date}.nc
   output-variables: ["segment_length",
                      "segment_stretch",
+                     "segment_orientation",
                      "segment_tail_longitude",
                      "segment_tail_latitude",
                      "segment_tail_pressure",

@@ -16,6 +16,7 @@ public class LGSegment
     
     // Avoid unnecessary recalculations
     private double _SegmentLength;
+    private double _Orientation;
 
     public double SegmentLength
     {
@@ -23,6 +24,15 @@ public class LGSegment
         {
             UpdateProperties();
             return _SegmentLength;
+        }
+    }
+
+    public double Orientation
+    {
+        get
+        {
+            UpdateProperties();
+            return _Orientation;
         }
     }
     
@@ -94,6 +104,7 @@ public class LGSegment
         CalculateSegmentLength();
         // Update the midpoint
         CalculateSegmentMidpoint();
+        CalculateOrientation();
         Stale = false;
     }
 
@@ -109,6 +120,11 @@ public class LGSegment
             Head.X, Head.Y, 3);
         _XMidpoint = lons[1];
         _YMidpoint = lats[1];
+    }
+
+    private void CalculateOrientation()
+    {
+        _Orientation = Geodesy.CourseDegrees(Tail.X, Tail.Y, Head.X, Head.Y);
     }
 
     public double GetProperty(string property)
@@ -141,6 +157,8 @@ public class LGSegment
             case "headp":
             case "headpressure":
                 return Head.Pressure;
+            case "orientation":
+                return Orientation;
             default:
                 throw new ArgumentException($"No property for LGSegment called {property}");
         }
