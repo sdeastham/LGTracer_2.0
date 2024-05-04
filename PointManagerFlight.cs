@@ -147,7 +147,7 @@ public class PointManagerFlight : PointManager
                     // Seeding covers all points which occurred since the last seeding time
                     newPoint.InitiationDate = seed.DeploymentTime;
                     newPoint.ArchiveConditions(true);
-                    newPoint.Advance((endTime - LastSeedTime).TotalSeconds, Domain);
+                    newPoint.Advance((endTime - seed.DeploymentTime).TotalSeconds, Domain);
                     newPoint.ArchiveConditions(false);
                 }
                 nWaypointsLeft += flightSegment.WaypointsRemaining;
