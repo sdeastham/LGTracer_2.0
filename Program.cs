@@ -72,7 +72,9 @@ public class Program
         // Time handling
         double nDays = (endDate - startDate).TotalDays; // Days to run
         double duration = 60.0 * 60.0 * 24.0 * nDays; // Simulation duration in seconds
-        double tStart = 0.0;
+        // Use epoch time
+        DateTime refDate = new DateTime(1970, 1, 1, 0, 0, 0, 0);
+        double tStart = (startDate - refDate).TotalSeconds;
         double tStop = tStart + duration;
         double tCurr = tStart;
         int iterMax = (int)Math.Ceiling((tStop - tStart)/dt);
@@ -199,7 +201,7 @@ public class Program
             }
 
             nSteps++;
-            tCurr = (iter+1) * dt;
+            tCurr = tStart + (iter+1) * dt;
             currentDate = currentDate.AddSeconds(dt);
             
             // Update the user on simulation progress
