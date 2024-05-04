@@ -241,11 +241,6 @@ public class Program
                 {
                     long maxPoints = pointManager.MaxStoredPoints;
                     string fileName = pointManager.WriteToFile(currentDate,reset: true);
-                    if (verbose)
-                    {
-                        Console.WriteLine(
-                            $"Output data with {nStored} samples [max points stored: {maxPoints}] successfully written to {fileName}.");
-                    }
                 }
                 tOutput += dtOutput;
                 nStored = 0;
