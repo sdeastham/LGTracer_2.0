@@ -121,18 +121,22 @@ public class LGSegment
                 return SegmentLength;
             case "tailx":
             case "taillon":
+            case "taillongitude":
                 return Tail.X;
             case "taily":
             case "taillat":
+            case "taillatitude":
                 return Tail.Y;
             case "tailp":
             case "tailpressure":
                 return Tail.Pressure;
             case "headx":
             case "headlon":
+            case "headlongitude":
                 return Head.X;
             case "heady":
             case "headlat":
+            case "headlatitude":
                 return Head.Y;
             case "headp":
             case "headpressure":

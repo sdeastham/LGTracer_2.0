@@ -30,17 +30,18 @@ points-flights:
   max: null
   adiabatic-compression: true
   output-filename: flight-waypoints-{date}.nc
-  write-trajectories: true
-  trajectory-filename: trajectory-{date}-{uid}.parquet
   output-variables: ["segment_length",
                      "segment_stretch",
-                     "segment_tail_x",
-                     "segment_tail_y",
-                     "segment_tail_p",
+                     "segment_tail_longitude",
+                     "segment_tail_latitude",
+                     "segment_tail_pressure",
                      "contrail_ice_mass",
                      "contrail_settling_velocity",
                      "contrail_crystal_radius",
                      "contrail_cross_section_area"]
+  write-trajectories: true
+  trajectory-filename: trajectories-{date}.parquet
+  trajectory-variables: ["segment_length"]     
   # Contrail options
   contrail-simulation: true
   include-settling: true

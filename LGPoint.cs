@@ -127,7 +127,7 @@ public class LGPoint : IAdvected
             case "age":
                 return Age;
             case "uid":
-                return UID;
+                return UID; // Casting from ulong to double..
             default:
                 throw new ArgumentException($"No property for LGPoint called {property}");
         }

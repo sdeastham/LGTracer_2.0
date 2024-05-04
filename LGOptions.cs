@@ -71,6 +71,7 @@ public abstract class LGOptionsPoints
     public string[] OutputVariables = [];
     public bool WriteTrajectories = false;
     public string TrajectoryFilename = "default_trajectory_{date}_{uid}.nc";
+    public string[] TrajectoryVariables = [];
 
     public bool Active => (Max == null || Max > 0);
 }

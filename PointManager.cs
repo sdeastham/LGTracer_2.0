@@ -38,16 +38,6 @@ public abstract class PointManager
 
     public DomainManager Domain { get; protected set; }
 
-    private List<double[]> XHistory;
-
-    private List<double[]> YHistory;
-
-    private List<double[]> PressureHistory;
-
-    private List<double[]> AgeHistory;
-
-    private List<uint[]> UIDHistory;
-
     private List<double> TimeHistory;
 
     private Dictionary<string, List<double[]>> PropertyHistory;
@@ -73,6 +63,10 @@ public abstract class PointManager
     { get; private set; }
     public string TrajectoryFilename
     { get; private set; }
+    
+    private Dictionary<string, List<double[]>> TrajectoryPropertyHistory;
+
+    private List<string> TrajectoryPropertyNames => TrajectoryPropertyHistory.Keys.ToList();
 
     private DateTime StorageStartTime;
 
@@ -116,7 +110,24 @@ public abstract class PointManager
         InactivePoints = [];
         NActive = 0;
         NInactive = 0;
-        InitializeHistory(configSubOptions.OutputVariables);
+        TimeHistory = [];
+        PropertyHistory = [];
+        // Add default properties
+        List<string> extendedVariables = ["UID", "longitude", "latitude", "pressure", "age"];
+        foreach (string property in configSubOptions.OutputVariables)
+        {
+            if (!extendedVariables.Contains(property))
+            {
+                extendedVariables.Add(property);
+            }
+        }
+        InitializeHistory(PropertyHistory,extendedVariables.ToArray());
+        MaxStoredPoints = 0;
+        if (WriteTrajectories)
+        {
+            TrajectoryPropertyHistory = [];
+            InitializeHistory(TrajectoryPropertyHistory,configSubOptions.TrajectoryVariables);
+        }
 
         // Domain manager to use for culling etc
         Domain = domain;
@@ -138,38 +149,13 @@ public abstract class PointManager
         return new LGPoint(VelocityCalc);
     }
 
-    private void InitializeHistory(string[]? propertyNames)
+    private static void InitializeHistory(Dictionary<string,List<double[]>> propertyHistory, string[] propertyNames)
     {
-        PropertyHistory = [];
-        if (propertyNames != null)
-        {
-            foreach (string property in propertyNames)
-            {
-                List<double[]> newProperty = [];
-                PropertyHistory.Add(property,newProperty);
-            }
-        }
-        InitializeHistory();
-    }
-    private void InitializeHistory()
-    {
-        // Max number of points stored out in any single sample (diagnostic only)
-        MaxStoredPoints = 0;
-
-        // For output
-        TimeHistory = [];
-        XHistory = [];
-        YHistory = [];
-        PressureHistory = [];
-        AgeHistory = [];
-        UIDHistory = [];
-
-        List<string> propertyNames = PropertyHistory.Keys.ToList();
-        PropertyHistory.Clear();
+        propertyHistory.Clear();
         foreach (string property in propertyNames)
         {
             List<double[]> newProperty = [];
-            PropertyHistory[property] = newProperty;
+            propertyHistory[property] = newProperty;
         }
     }
     
@@ -342,11 +328,6 @@ public abstract class PointManager
         }
             
         // Convert the lists into conventional 2D arrays
-        double[,] x2D = new double[nTimes, nPoints];
-        double[,] y2D = new double[nTimes, nPoints];
-        double[,] p2D = new double[nTimes, nPoints];
-        double[,] age2D = new double[nTimes, nPoints];
-        uint[,] UIDs = new uint[nTimes, nPoints];
         int nProperties = PropertyNames.Count();
         double[,,] properties2D = new double[nProperties, nTimes, nPoints];
             
@@ -354,20 +335,11 @@ public abstract class PointManager
 
         for (int i=0; i<nTimes; i++)
         {
-            nCurrent = XHistory[i].Length;
+            nCurrent = PropertyHistory["UID"][i].Length;
             for (int j=0; j<nPoints; j++)
             {
                 if (j < nCurrent)
                 {
-                    x2D[i,j] = XHistory[i][j];
-                    y2D[i,j] = YHistory[i][j];
-                    p2D[i,j] = PressureHistory[i][j];
-                    age2D[i,j] = AgeHistory[i][j];
-                    UIDs[i,j] = UIDHistory[i][j];
-                    //for (int k = 0; k < nProperties; k++)
-                    //{
-                    //    properties2D[k,i,j] = PropertyHistory[k][i][j];
-                    //}
                     int k = 0;
                     foreach (string property in PropertyNames)
                     {
@@ -377,15 +349,10 @@ public abstract class PointManager
                 }
                 else
                 {
-                    x2D[i,j] = double.NaN;
-                    y2D[i,j] = double.NaN;
-                    p2D[i,j] = double.NaN;
-                    age2D[i,j] = double.NaN;
                     for (int k = 0; k < nProperties; k++)
                     {
                         properties2D[k,i,j] = double.NaN;
                     }
-                    UIDs[i,j] = 0;
                 }
             }
         }
@@ -394,11 +361,6 @@ public abstract class PointManager
         {
             ds.AddAxis("index","-",index);
             ds.AddAxis("time","seconds",TimeHistory.ToArray());
-            ds.AddVariable(typeof(double), "x", x2D, ["time","index"]);
-            ds.AddVariable(typeof(double), "y", y2D, ["time","index"]);
-            ds.AddVariable(typeof(double), "pressure", p2D, ["time","index"]);
-            ds.AddVariable(typeof(double), "age", age2D, ["time","index"]);
-            ds.AddVariable(typeof(uint), "UID", UIDs, ["time","index"]);
             for (int k = 0; k < nProperties; k++)
             {
                 double[,] property2D = new double[nTimes, nPoints];
@@ -418,7 +380,8 @@ public abstract class PointManager
         if (reset)
         {
             MaxStoredPoints = 0;
-            InitializeHistory();
+            TimeHistory = [];
+            InitializeHistory(PropertyHistory,PropertyNames.ToArray());
         }
 
         if (WriteTrajectories)
@@ -433,11 +396,6 @@ public abstract class PointManager
     {
         MaxStoredPoints = Math.Max(MaxStoredPoints,NActive);
         long nPoints = NActive;
-        double[] ages           = new double[nPoints];
-        double[] xPoints        = new double[nPoints];
-        double[] yPoints        = new double[nPoints];
-        double[] pressurePoints = new double[nPoints];
-        uint[] UIDs = new uint[nPoints];
         List<double[]> properties = [];
         int nProperties = PropertyNames.Count();
         for (int k = 0; k < nProperties; k++)
@@ -448,13 +406,10 @@ public abstract class PointManager
         long i=0;
         foreach (IAdvected point in ActivePoints)
         {
-            ages[i] = point.GetAge();
-            (xPoints[i], yPoints[i], pressurePoints[i]) = point.GetLocation();
-            UIDs[i] = point.GetUID();
-            // Get any remaining properties from the point
+            // Get all properties from the point
             // Need to allow for different point classes
             // It would be better here to register the get methods at manager initialization, but
-            // that may not be straightforward
+            // that may not be straightforward since we can't have pointers
             int k = 0;
             foreach (string property in PropertyNames)
             {
@@ -469,11 +424,6 @@ public abstract class PointManager
             i++;
         }
         TimeHistory.Add(tCurr);
-        XHistory.Add(xPoints);
-        YHistory.Add(yPoints);
-        PressureHistory.Add(pressurePoints);
-        UIDHistory.Add(UIDs);
-        AgeHistory.Add(ages);
         int iProperty = 0;
         foreach (string property in PropertyNames)
         {
