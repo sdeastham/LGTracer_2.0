@@ -1,6 +1,10 @@
 ﻿using System.Globalization;
+using System.Net.Sockets;
 using Microsoft.VisualBasic.FileIO; // For parsing CSVs
 using AtmosTools;
+using Parquet;
+using Parquet.Data;
+using Parquet.Schema;
 
 namespace LGTracer;
 
@@ -17,6 +21,46 @@ public class PointManagerFlight : PointManager
     protected bool SkipNewtonIterationForTlm;
     protected bool UsePonaterTlc;
 
+    protected FlightPointArchive TrajectoryMatch;
+    private string FlightArchiveFilename;
+
+    protected class FlightPointArchive
+    {
+        public List<ulong> UIDs;
+        public List<string> FlightNames;
+        public List<string> SeedTimes;
+        private CultureInfo Culture;
+
+        public FlightPointArchive()
+        {
+            UIDs = [];
+            FlightNames = [];
+            SeedTimes = [];
+            Culture = CultureInfo.InvariantCulture;
+        }
+
+        public void Add(ulong pointUID, string flight, DateTime seedTime)
+        {
+            UIDs.Add(pointUID);
+            FlightNames.Add(flight);
+            SeedTimes.Add(seedTime.ToString("yyyyMMddTHHmmss"));
+        }
+
+        public (ulong[], string[], string[]) Output(bool reset=true)
+        {
+            ulong[] outUIDs = UIDs.ToArray();
+            string[] outFlights = FlightNames.ToArray();
+            string[] outDateTimes = SeedTimes.ToArray();
+            if (reset)
+            {
+                UIDs.Clear();
+                FlightNames.Clear();
+                SeedTimes.Clear();
+            }
+            return (outUIDs, outFlights, outDateTimes);
+        }
+    }
+
     public PointManagerFlight( DomainManager domain, LGOptions configOptions, LGOptionsPointsFlights configSubOptions, Random rng ) : base(
         domain, configOptions, configSubOptions )
     {
@@ -30,6 +74,8 @@ public class PointManagerFlight : PointManager
         SkipNewtonIterationForTlm = configSubOptions.SkipNewtonIterationForTlm;
         UsePonaterTlc = configSubOptions.UsePonaterTlc;
         AirportNameField = configSubOptions.UseIcao ? "ICAO" : "IATA";
+        TrajectoryMatch = new FlightPointArchive();
+        FlightArchiveFilename = configSubOptions.TrajectoryIdentifierFilename;
     }
 
     protected override IAdvected CreatePoint()
@@ -149,6 +195,10 @@ public class PointManagerFlight : PointManager
                     newPoint.ArchiveConditions(true);
                     newPoint.Advance((endTime - seed.DeploymentTime).TotalSeconds, Domain);
                     newPoint.ArchiveConditions(false);
+                    if (WriteTrajectories)
+                    {
+                        TrajectoryMatch.Add(newPoint.GetUID(), flightLabel, seed.DeploymentTime);
+                    }
                 }
                 nWaypointsLeft += flightSegment.WaypointsRemaining;
             }
@@ -251,7 +301,7 @@ public class PointManagerFlight : PointManager
             // Also Airline, but not currently used
 
             // Not entirely sure why this is needed
-            CultureInfo cultureInfo = new CultureInfo("en-US");
+            CultureInfo cultureInfo = CultureInfo.InvariantCulture;
             while (!csvParser.EndOfData)
             {
                 string[] fields = csvParser.ReadFields();
@@ -318,6 +368,49 @@ public class PointManagerFlight : PointManager
         if (VerboseOutput)
         {
             Console.WriteLine($"Schedule parsed. Found {nFlights} flights in {nEntries} schedule entries.");
+        }
+    }
+
+    private ParquetSchema? FlightSchema = null;
+    protected override async void WriteTrajectoriesToFile()
+    {
+        // Write out trajectory data as normal
+        base.WriteTrajectoriesToFile();
+        
+        // Need to write out the file which tells you which points correspond to which flights
+        if (FlightSchema == null)
+        {
+            // Only define this once
+            Field[] dataFields = new Field[3];
+            dataFields[0] = new DataField<ulong>("UID");
+            dataFields[1] = new DataField<string>("Flight");
+            dataFields[2] = new DataField<string>("DateTime");
+
+            FlightSchema = new ParquetSchema(dataFields);
+        }
+
+        // Get the data and reset the holder
+        (ulong[] pointUIDs, string[] flightNames, string[] seedTimes) = TrajectoryMatch.Output(reset: true);
+        
+        // Generate filename
+        string filenameShort = FlightArchiveFilename.Replace("{date}", StorageStartTime.ToString("yyyyMMddTHHmmss"));
+        string filename = Path.Join(OutputDirectory, filenameShort);
+
+        // Could probably be more efficient..
+        using (Stream fs = File.OpenWrite(filename))
+        {
+            using (ParquetWriter writer = await ParquetWriter.CreateAsync(FlightSchema, fs))
+            {
+                using (ParquetRowGroupWriter groupWriter = writer.CreateRowGroup())
+                {
+                    var columnUID = new DataColumn(FlightSchema.DataFields[0], pointUIDs);
+                    await groupWriter.WriteColumnAsync(columnUID);
+                    var columnNames = new DataColumn(FlightSchema.DataFields[1], flightNames);
+                    await groupWriter.WriteColumnAsync(columnNames);
+                    var columnTimes = new DataColumn(FlightSchema.DataFields[2], seedTimes);
+                    await groupWriter.WriteColumnAsync(columnTimes);
+                }
+            }
         }
     }
 

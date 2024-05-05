@@ -21,7 +21,7 @@ public class LGPointConnected(
     // Indicates whether this was the most recently created point in its chain
     protected bool IsLeader = false;
     // How long before we let a point die even if it is no longer connecteD?
-    protected double MinimumPointLifetime = minimumPointLifetime;
+    protected double MinimumPointLifetime = minimumPointLifetime * 3600.0;
 
     public void Connect(LGPointConnected? predecessor, uint? segmentID = null, string segmentSource = "UNKNOWN", Action<LGPointConnected>? cleanup=null)
     {

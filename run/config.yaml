@@ -42,7 +42,10 @@ points-flights:
                      "contrail_cross_section_area"]
   write-trajectories: true
   trajectory-filename: trajectories-{date}.parquet
-  trajectory-variables: ["segment_length"]     
+  trajectory-variables: ["segment_length",
+                         "segment_orientation",
+                         "time"]
+  trajectory-identifier-filename: flightmatch-{date}.parquet
   # Contrail options
   contrail-simulation: true
   include-settling: true

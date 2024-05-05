@@ -95,6 +95,7 @@ public class LGOptionsPointsFlights : LGOptionsPoints
     public double MinimumLifetime = 0.0;
     public bool SkipNewtonIterationForTlm = false;
     public bool UsePonaterTlc = false;
+    public string TrajectoryIdentifierFilename = "flightmatch-{date}.parquet";
 }
 
 public class LGOptionsDomain

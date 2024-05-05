@@ -69,7 +69,7 @@ public abstract class PointManager
 
     private List<string> TrajectoryPropertyNames => TrajectoryPropertyHistory.Keys.ToList();
 
-    private DateTime StorageStartTime;
+    protected DateTime StorageStartTime;
 
     private DateTime CurrentTime;
 
@@ -135,6 +135,7 @@ public abstract class PointManager
                     extendedVariables.Add(property);
                 }
             }
+            
             TrajectoryPropertyHistory = [];
             InitializeHistory(TrajectoryPropertyHistory, extendedVariables.ToArray());
         }
@@ -180,7 +181,7 @@ public abstract class PointManager
         if (WriteTrajectories)
         {
             // Tell the point what data it will need to archive
-            point.SetupHistory(PropertyNames);
+            point.SetupHistory(TrajectoryPropertyNames);
         }
 
         // Activate a point (doesn't matter if it's the same one) and return it
@@ -466,10 +467,8 @@ public abstract class PointManager
 
     private ParquetSchema? Schema = null;
 
-    private async void WriteTrajectoriesToFile()
+    protected virtual async void WriteTrajectoriesToFile()
     {
-        //Console.WriteLine($"Writing point information to {Filename}");
-        //ParquetSerializer.SerializeAsync(History, Filename);
         if (Schema == null)
         {
             // Only define this once

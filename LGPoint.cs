@@ -34,6 +34,8 @@ public class LGPoint : IAdvected
         return Age;
     }
 
+    private static readonly DateTime ReferenceTime = new DateTime(1970, 1, 1, 0, 0, 0);
+
     // Convenience properties
     public double X
     { 
@@ -126,6 +128,8 @@ public class LGPoint : IAdvected
                 return Pressure;
             case "age":
                 return Age;
+            case "time":
+                return (InitiationDate + TimeSpan.FromSeconds(Age) - ReferenceTime).TotalSeconds;
             case "uid":
                 return UID; // Casting from ulong to double..
             default:
