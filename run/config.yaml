@@ -1,7 +1,7 @@
 ﻿---
 timing:
   start-date: "2023-01-01 00:00:00"
-  end-date: "2023-01-05 00:00:00"
+  end-date: "2023-01-02 00:00:00"
 timesteps:
   # Simulation heartbeat (seconds)
   simulation: 300.0

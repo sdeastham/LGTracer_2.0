@@ -80,6 +80,7 @@ public class Program
                   650.0e2, 700.0e2, 750.0e2, 775.0e2, 800.0e2,
                   825.0e2, 850.0e2, 875.0e2, 900.0e2, 925.0e2,
                   950.0e2, 975.0e2,1000.0e2];
+            Array.Reverse(AP); // All data will be flipped internally
             BP = new double[AP.Length];
             for (int i = 0; i < AP.Length; i++)
             {
