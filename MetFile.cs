@@ -208,7 +208,8 @@ public abstract class MetFile : IMetFile
         // Reads a units string (e.g. "minutes since 2023-01-01 00:00:00.0")
         // and a series of integers, returns the corresponding vector of DateTimes
         int nTimes = timeDeltas.Length;
-        int secondsMult;
+        // WARNING: This needs to be a long or you can get integer overflow when multiplying by timeOffsets
+        long secondsMult;
         string[] substrings = units.Split(' ');
         string timeType = substrings[0].ToLower();
         switch (timeType)
