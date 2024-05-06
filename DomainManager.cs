@@ -121,6 +121,9 @@ public class DomainManager
 
     protected double[] BP
     { get; set; }
+    
+    protected bool FixedPressures
+    { get; private set; }
 
     public double[,] CellArea
     { get; protected set; }
@@ -133,7 +136,8 @@ public class DomainManager
     private Dictionary<string, Stopwatch> Stopwatches;
 
     public DomainManager(double[] lonEdge, double[] latEdge, double[] pLimits, double[] pOffsets, double[] pFactors,
-        MetManager meteorology, Dictionary<string, Stopwatch> stopwatches, bool boxHeightsNeeded = false)
+        MetManager meteorology, Dictionary<string, Stopwatch> stopwatches, bool boxHeightsNeeded = false,
+        bool fixedPressures = false)
     {
         // Register stopwatches
         Stopwatches = stopwatches;
@@ -148,6 +152,7 @@ public class DomainManager
         AP = pOffsets;
         BP = pFactors;
         NLevels = AP.Length - 1;
+        FixedPressures = fixedPressures;
 
         // Set up the mesh (units of degrees)
         // The original lon/lat limits aren't important - need the mesh limits
@@ -250,7 +255,8 @@ public class DomainManager
         Meteorology = meteorology;
         
         // Generate derived quantities (e.g. pressure edges)
-        UpdateMeteorology();
+        // Force an update the first time around
+        UpdateMeteorology(true);
     }
 
     [MemberNotNull(nameof(CellArea))]
@@ -278,10 +284,13 @@ public class DomainManager
         }
     }
 
-    public void UpdateMeteorology()
+    public void UpdateMeteorology(bool forceUpdate=false)
     {
-        Stopwatches["Derived quantities"].Start();
         // Update derived quantities
+        if (FixedPressures && !forceUpdate) { return; }
+        
+        Stopwatches["Derived quantities"].Start();
+        
         UpdatePressures();
 
         // Find the level which corresponds to the base and ceiling of the domain

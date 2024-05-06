@@ -61,13 +61,43 @@ public class Program
         
         // Check if the domain manager will need to calculate box heights (expensive)
         bool boxHeightsNeeded = configOptions.PointsFlights is { Active: true, ComplexContrails: true };
-
+        
+        // Are we using MERRA-2 or ERA5 data?
+        string dataSource = configOptions.InputOutput.MetSource;
+        double[] AP, BP;
+        bool fixedPressures;
+        if (dataSource == "MERRA-2")
+        {
+            AP = MERRA2.AP;
+            BP = MERRA2.BP;
+            fixedPressures = false;
+        }
+        else if (dataSource == "ERA5")
+        {
+            AP = [ 70.0e2, 100.0e2, 125.0e2, 150.0e2, 175.0e2,
+                  200.0e2, 225.0e2, 250.0e2, 300.0e2, 350.0e2,
+                  400.0e2, 450.0e2, 500.0e2, 550.0e2, 600.0e2,
+                  650.0e2, 700.0e2, 750.0e2, 775.0e2, 800.0e2,
+                  825.0e2, 850.0e2, 875.0e2, 900.0e2, 925.0e2,
+                  950.0e2, 975.0e2,1000.0e2];
+            BP = new double[AP.Length];
+            for (int i = 0; i < AP.Length; i++)
+            {
+                BP[i] = 0.0;
+            }
+            fixedPressures = true;
+        }
+        else
+        {
+            throw new ArgumentException($"Meteorology data source {dataSource} not recognized.");
+        }
+        
         // Set up the meteorology and domain
         MetManager meteorology = new MetManager(configOptions.InputOutput.MetDirectory, lonLims, latLims, startDate, 
-            configOptions.InputOutput.SerialMetData, subwatches);
+            configOptions.InputOutput.SerialMetData, subwatches, dataSource);
         (double[] lonEdge, double[] latEdge) = meteorology.GetXYMesh();
-        DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, MERRA2.AP, MERRA2.BP,
-            meteorology, subwatches, boxHeightsNeeded);
+        DomainManager domainManager = new DomainManager(lonEdge, latEdge, pLims, AP, BP,
+            meteorology, subwatches, boxHeightsNeeded, fixedPressures);
 
         // Time handling
         double nDays = (endDate - startDate).TotalDays; // Days to run

@@ -58,12 +58,20 @@ public abstract class MetData<T> : IMetData
 
     private bool Initialized;
 
+    protected bool FlipY;
+
+    protected bool ConvertShort; // Does the data need to be converted from an array of short[...] to float[...]?
+    protected float ShortScaling = 1.0f;
+    protected float ShortOffset = 0.0f;
+
     protected MetData(string fieldName, int[] xBounds, int[] yBounds, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0, bool serializedData=false)
     {
         // Bounds of domain to be read in
         XBounds = xBounds;
-        YBounds = yBounds;
         NX = XBounds[1] - XBounds[0];
+
+        FlipY = (yBounds[1] < yBounds[0]);
+        YBounds = FlipY ? [yBounds[1],yBounds[0]] : yBounds;
         NY = YBounds[1] - YBounds[0];
 
         // The field to be read from the source file
@@ -108,9 +116,23 @@ public abstract class MetData<T> : IMetData
             switch (dataSource)
             {
                 case DataSet:
+                    if (!Initialized)
+                    {
+                        // ERA5 data is held as int16, i.e. short, rather than 32-bit floats, which are then converted
+                        // SDSLite does not have elegant methods to handle this
+                        Variable dsVariable = ((DataSet)(object)dataSource!).Variables[FieldName];
+                        ConvertShort = dsVariable.TypeOfData == typeof(short);
+                        if (ConvertShort)
+                        {
+                            var propertyDict = dsVariable.Metadata.AsDictionary();
+                            ShortScaling = Convert.ToSingle(propertyDict["scale_factor"]);
+                            ShortOffset = Convert.ToSingle(propertyDict["add_offset"]);
+                        }
+                    }
                     ReadData((DataSet)(object)dataSource!);
                     break;
                 case string:
+                    ConvertShort = false;
                     ReadData((string)(object)dataSource);
                     break;
                 default:
@@ -153,13 +175,15 @@ public abstract class MetData2D : MetData<double[,]>
 
     private void ScaleShiftData(float[,,] rawData)
     {
+        FlipRawData(rawData);
+        int nXRaw = rawData.GetLength(2);
         for (int t = 0; t < TimesPerFile; t++)
         {
             for (int i = 0; i < NX; i++)
             {
                 for (int j=0; j<NY; j++)
                 {
-                    FullData[t+1][j,i] = (rawData[t,j+YBounds[0],i+XBounds[0]] * ScaleValue) + OffsetValue;
+                    FullData[t+1][j,i] = (rawData[t,j+YBounds[0],(i+XBounds[0])%nXRaw] * ScaleValue) + OffsetValue;
                 }
             }
         }
@@ -167,13 +191,58 @@ public abstract class MetData2D : MetData<double[,]>
     
     protected override void ReadData(DataSet ds)
     {
-        ScaleShiftData(ds.GetData<float[,,]>(FieldName));
+        // ds.Variables[FieldName].GetData() WILL return an array, regardless of type
+        float[,,] rawData;
+        if (ConvertShort)
+        {
+            short[,,] tempShort = (short[,,])ds.Variables[FieldName].GetData();
+            int nTRaw = tempShort.GetLength(0);
+            int nYRaw = tempShort.GetLength(1);
+            int nXRaw = tempShort.GetLength(2);
+            rawData = new float[nTRaw, nYRaw, nXRaw];
+            for (int t = 0; t < nTRaw; t++)
+            {
+                for (int j = 0; j < nYRaw; j++)
+                {
+                    for (int i = 0; i < nXRaw; i++)
+                    {
+                        rawData[t, j, i] = ShortScaling * tempShort[t, j, i] + ShortOffset;
+                    }                
+                }
+            }
+        }
+        else
+        {
+            rawData = ds.GetData<float[,,]>(FieldName);
+        }
+        ScaleShiftData(rawData);
     }
 
     protected override void ReadData(string fileTemplate)
     {
         (_, float[,,] rawData) = NetcdfSerializer.Deserialize2D(string.Format(fileTemplate, FieldName));
         ScaleShiftData(rawData);
+    }
+
+    protected void FlipRawData(float[,,] rawData)
+    {
+        // We need to be able to handle data where the latitudes are reversed relative to what LGTracer uses
+        // (South -> North)
+        if (!FlipY) { return; }
+        int nYRaw = rawData.GetLength(1);
+        int nXRaw = rawData.GetLength(2);
+        for (int t = 0; t < rawData.GetLength(0); t++)
+        {
+            for (int j = 0; j < nYRaw; j++)
+            {
+                int jFlip = nYRaw - (j + 1);
+                for (int i = 0; i < nXRaw; i++)
+                {
+                    // Swaps the variables
+                    (rawData[t, j, i], rawData[t, jFlip, i]) = (rawData[t, jFlip, i], rawData[t, j, i]);
+                }
+            }
+        }
     }
 }
     
@@ -182,9 +251,13 @@ public abstract class MetData3D : MetData<double[,,]>
     public int NZ
     { get; protected set; }
 
-    public MetData3D(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
+    private bool SurfaceFirst;
+
+    public MetData3D(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile, double scaleValue=1.0, double offsetValue=0.0,
+        bool surfaceFirst=true) : base(fieldName,xBounds,yBounds,timesPerFile,scaleValue,offsetValue)
     {
         NZ = nLevels;
+        SurfaceFirst = surfaceFirst;
         FullData = new double[TimesPerFile+1][,,];
         for (int i=0; i<(TimesPerFile+1); i++)
         {
@@ -208,6 +281,7 @@ public abstract class MetData3D : MetData<double[,,]>
 
     private void ScaleShiftData(float[,,,] rawData)
     {
+        FlipRawData(rawData);
         for (int t = 0; t < TimesPerFile; t++)
         {
             for (int i = 0; i < NX; i++)
@@ -217,7 +291,50 @@ public abstract class MetData3D : MetData<double[,,]>
                     for (int k = 0; k < NZ; k++)
                     {
                         FullData[t + 1][k, j, i] =
-                            (rawData[t, k, j + YBounds[0], i + XBounds[0]] * ScaleValue) + OffsetValue;
+                            (rawData[t, k, j + YBounds[0], (i + XBounds[0])%NX] * ScaleValue) + OffsetValue;
+                    }
+                }
+            }
+        }
+    }
+    
+    protected void FlipRawData(float[,,,] rawData)
+    {
+        // We need to be able to handle data where the latitude and/or altitude are reversed relative to what
+        // LGTracer uses (surface = 0, South -> North)
+        if (!(FlipY || SurfaceFirst)) { return; }
+        int nZRaw = rawData.GetLength(1);
+        int nYRaw = rawData.GetLength(2);
+        int nXRaw = rawData.GetLength(3);
+        for (int t = 0; t < rawData.GetLength(0); t++)
+        {
+            for (int k = 9; k < nZRaw; k++)
+            {
+                int kFlip;
+                if (SurfaceFirst)
+                {
+                    kFlip = k;
+                }
+                else
+                {
+                    kFlip = nZRaw - (k + 1);
+                }
+                for (int j = 0; j < nYRaw; j++)
+                {
+                    int jFlip;
+                    if (FlipY)
+                    {
+                        jFlip = nYRaw - (j + 1);
+                    }
+                    else
+                    {
+                        jFlip = j;
+                    }
+                    for (int i = 0; i < nXRaw; i++)
+                    {
+                        // Swaps the variables
+                        (rawData[t, k, j, i], rawData[t, kFlip, jFlip, i]) =
+                            (rawData[t, kFlip, jFlip, i], rawData[t, k, j, i]);
                     }
                 }
             }
@@ -226,7 +343,34 @@ public abstract class MetData3D : MetData<double[,,]>
     
     protected override void ReadData(DataSet ds)
     {
-        ScaleShiftData(ds.GetData<float[,,,]>(FieldName));
+        float[,,,] rawData;
+        if (ConvertShort)
+        {
+            short[,,,] tempShort = (short[,,,])ds.Variables[FieldName].GetData();
+            int nTRaw = tempShort.GetLength(0);
+            int nZRaw = tempShort.GetLength(1);
+            int nYRaw = tempShort.GetLength(2);
+            int nXRaw = tempShort.GetLength(3);
+            rawData = new float[nTRaw, nZRaw, nYRaw, nXRaw];
+            for (int t = 0; t < nTRaw; t++)
+            {
+                for (int i = 0; i < nXRaw; i++)
+                {
+                    for (int j = 0; j < nYRaw; j++)
+                    {
+                        for (int k = 0; k < nZRaw; k++)
+                        {
+                            rawData[t, k, j, i] = ShortScaling * tempShort[t, k, j, i] + ShortOffset;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            rawData = ds.GetData<float[,,,]>(FieldName);
+        }
+        ScaleShiftData(rawData);
     }
 
     protected override void ReadData(string fileTemplate)
@@ -245,8 +389,8 @@ public class MetData3DFixed : MetData3D
     }
 
     public MetData3DFixed(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile,
-        double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
-        scaleValue, offsetValue) {}
+        double scaleValue = 1.0, double offsetValue = 0.0, bool surfaceFirst = true) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
+        scaleValue, offsetValue, surfaceFirst) {}
 }
 
 public class MetData2DFixed : MetData2D
@@ -287,8 +431,8 @@ public class MetData3DLinterp : MetData3D
     }
 
     public MetData3DLinterp(string fieldName, int[] xBounds, int[] yBounds, int nLevels, int timesPerFile,
-        double scaleValue = 1.0, double offsetValue = 0.0) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
-        scaleValue, offsetValue) {}
+        double scaleValue = 1.0, double offsetValue = 0.0, bool surfaceFirst = true) : base(fieldName, xBounds, yBounds, nLevels, timesPerFile,
+        scaleValue, offsetValue, surfaceFirst) {}
 }
     
 public class MetData2DLinterp : MetData2D

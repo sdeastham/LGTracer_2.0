@@ -64,7 +64,11 @@ domain:
   pressure-base: 850.0
   pressure-ceiling: 200.0
 input-output:
-  met-directory: "C:/Data/MERRA-2"
+  # Met source must be MERRA-2 or ERA5
+  #met-source: "MERRA-2"
+  #met-directory: "C:/Data/MERRA-2"
+  met-source: "ERA5"
+  met-directory: "C:/Data/ERA5"
   output-directory: "C:/Data/LGTracer/output"
   input-directory: "C:/Data/LGTracer/input"
   serial-met-data: false

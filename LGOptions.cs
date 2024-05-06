@@ -116,4 +116,5 @@ public class LGOptionsIO
     public string OutputDirectory = "";
     public string InputDirectory = "";
     public bool SerialMetData = false;
+    public string MetSource = "MERRA-2";
 }

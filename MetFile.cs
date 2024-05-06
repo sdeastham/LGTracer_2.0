@@ -59,6 +59,10 @@ public abstract class MetFile : IMetFile
     protected TimeSpan TimeDelta;
     protected DateTime FirstTime;
     protected double ScaleValue, OffsetValue;
+    
+    // Options to handle different data conventions
+    protected bool SurfaceFirst; // Is the first index the surface or TOA?
+    protected bool FlipLats; // Are the file latitudes reversed (i.e. running N->S)?
 
     protected DateTime LeftBracketTime => TimeVec[TimeIndex - 1];
     protected DateTime RightBracketTime => TimeVec[TimeIndex];
@@ -93,16 +97,26 @@ public abstract class MetFile : IMetFile
         int nTimes = TimeVec.Length - 1;
         // Assume uniform spacing
         TimeDelta = TimeVec[1] - TimeVec[0];
+        // Use this to indicate to the met data that the latitudes need to be flipped
+        int[] yBounds;
+        if (FlipLats)
+        {
+            yBounds = [YBounds[1], YBounds[0]];
+        }
+        else
+        {
+            yBounds = YBounds;
+        }
         foreach (string varName in dataFields2D)
         {
             IMetData metVar;
             if (timeInterp)
             {
-                metVar = new MetData2DLinterp(varName, XBounds, YBounds, nTimes, ScaleValue, OffsetValue);
+                metVar = new MetData2DLinterp(varName, XBounds, yBounds, nTimes, ScaleValue, OffsetValue);
             }
             else
             {
-                metVar = new MetData2DFixed(varName, XBounds, YBounds, nTimes, ScaleValue, OffsetValue);
+                metVar = new MetData2DFixed(varName, XBounds, yBounds, nTimes, ScaleValue, OffsetValue);
             }
             DataVariables.Add(metVar);
             DataNames.Add(varName);
@@ -112,12 +126,13 @@ public abstract class MetFile : IMetFile
             IMetData metVar;
             if (timeInterp)
             {
-                metVar = new MetData3DLinterp(varName, XBounds, YBounds, NLevels, nTimes, ScaleValue,
-                    OffsetValue);
+                metVar = new MetData3DLinterp(varName, XBounds, yBounds, NLevels, nTimes, ScaleValue,
+                    OffsetValue, SurfaceFirst);
             }
             else
             {
-                metVar = new MetData3DFixed(varName, XBounds, YBounds, NLevels, nTimes, ScaleValue, OffsetValue);
+                metVar = new MetData3DFixed(varName, XBounds, yBounds, NLevels, nTimes, ScaleValue,
+                    OffsetValue, SurfaceFirst);
             }
             DataVariables.Add(metVar);
             DataNames.Add(varName);
@@ -131,7 +146,15 @@ public abstract class MetFile : IMetFile
     {
         foreach (IMetData metVar in DataVariables)
         {
-            UpdateVar(metVar,readFile);
+            try
+            {
+                UpdateVar(metVar, readFile);
+            }
+            catch
+            {
+                Console.WriteLine($"Error updating {metVar.GetName()}.");
+                throw;
+            }
         }
     }
 
@@ -241,35 +264,51 @@ public abstract class MetFile : IMetFile
         return timeVec;
     }
 
-    protected static (double [], double[], int[], int[] ) ParseLatLon( float[]? lonMids, float[]? latMids, double[] lonLims, double[] latLims )
+    protected static (double [], double[], int[], int[] ) ParseLatLon( float[] lonMids, float[] latMids, double[] lonLims, double[] latLims )
     {
         Func<double,double,double,int> findLower = (targetValue, lowerBound, spacing) => ((int)Math.Floor((targetValue - lowerBound)/spacing));
         double[] lonEdge,latEdge;
         int nLon, nLat, lonFirst, latFirst, lonLast, latLast;
         double dLon, dLat, lonBase, latBase;
+        // Longitude and latitude midpoints and limits must be monotonically increasing (W->E, S->N)
 
         // Figure out which cells we need to keep in order to get all the data we need
         // Assume a fixed cell spacing for now
         dLon = lonMids[1] - lonMids[0];
         lonBase = lonMids[0] - (dLon/2.0);
-        // For latitude, be careful about half-polar grids
-        dLat = latMids[3] - latMids[2];
-        latBase = latMids[1] - (3.0*dLon/2.0);
-
+        // Need to deal with the possibility that the domain crosses the "edge". We handle this by ensuring that
+        // data fetches are done module NX, at which point the only requirement is that all our boundaries are
+        // monotonically increasing (i.e. longitude boundary 0 is less than boundary 1)
+        while (lonBase > lonLims[0])
+        {
+            lonBase -= 360.0;
+        }
         // These indices are for the first and last cell _inclusive_
-        latFirst = findLower(latLims[0],latBase,dLat);
-        latLast  = findLower(latLims[1],latBase,dLat);
         lonFirst = findLower(lonLims[0],lonBase,dLon);
         lonLast  = findLower(lonLims[1],lonBase,dLon);
-
         nLon = 1 + (lonLast - lonFirst);
+
+        // For latitude, be careful about half-polar grids
+        dLat = latMids[3] - latMids[2];
+        latBase = latMids[1] - (3.0 * dLat / 2.0);
+        
+        latFirst = findLower(latLims[0],latBase,dLat);
+        latLast  = findLower(latLims[1],latBase,dLat);
+        
         nLat = 1 + (latLast - latFirst);
         
         // Create lon/lat edge vectors
         lonEdge = new double[nLon+1];
         latEdge = new double[nLat+1];
-        lonEdge[0] = lonMids[lonFirst] - (dLon/2.0);
         latEdge[0] = latMids[latFirst] - (dLat/2.0);
+        
+        // Internally, we treat [-180,180) as the valid longitude range
+        double lonEastBoundary = lonMids[lonFirst%lonMids.Length] - (dLon/2.0);
+        while (lonEastBoundary < -180.0) { lonEastBoundary += 360.0; }
+        while (lonEastBoundary >= 180.0) { lonEastBoundary -= 360.0; }
+        lonEdge[0] = lonEastBoundary;
+        
+        // This ensures monotonicity
         for (int i=0;i<nLon;i++)
         {
             lonEdge[i+1] = lonEdge[0] + (dLon * (i+1));
@@ -294,6 +333,7 @@ public class MetFileNetCDF : MetFile
 {
     private DataSet DS;
     private NetCDFUri DSUri;
+    private static readonly string[] pressureUnits = new[] {"mb","millibar","millibars","pa","pascal","pascals","hpa","hectopascal","hectopascals"};
 
     public MetFileNetCDF(string fileTemplate, DateTime firstTime, double[] xLim, double[] yLim, int secondOffset = 0) :
         base(fileTemplate, firstTime, xLim, yLim, secondOffset)
@@ -331,19 +371,74 @@ public class MetFileNetCDF : MetFile
         if (firstRead || XBounds == null || YBounds == null || XEdge == null || YEdge == null)
         {
             // Set up the domain too
-            float[]? latMids = DS.GetData<float[]>("lat");
-            float[]? lonMids = DS.GetData<float[]>("lon");
-            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
-            if (DS.Variables.Contains("lev"))
+            string? latVar, lonVar, levVar;
+            lonVar = testVarPresence(["lon", "longitude"], DS);
+            latVar = testVarPresence(["lat", "latitude"], DS);
+            levVar = testVarPresence(["lev", "level"], DS);
+            // If we are missing longitude or latitude, cannot proceed
+            if (lonVar == null || latVar == null)
             {
-                float[] levels = DS.GetData<float[]>("lev");
+                throw new ArgumentException($"No valid longitude or latitude variable found in file.");
+            }
+            // Missing level might be OK
+            bool levFound = (levVar != null);
+            float[] latMids = DS.GetData<float[]>(latVar);
+            float[] lonMids = DS.GetData<float[]>(lonVar);
+            
+            // Some files have latitudes arranged N -> S; these will need to be flipped
+            FlipLats = (latMids[1] < latMids[0]);
+            if (FlipLats)
+            {
+                Array.Reverse(latMids);
+            }
+            
+            (XEdge, YEdge, XBounds, YBounds ) = ParseLatLon( lonMids, latMids, XLim, YLim );
+            if (levFound)
+            {
+                float[] levels;
+                if (DS.Variables[levVar].TypeOfData == typeof(int))
+                {
+                    int[] intLevels = DS.GetData<int[]>(levVar);
+                    levels = intLevels.Select(d => (float)d).ToArray();
+                }
+                else
+                {
+                    levels = DS.GetData<float[]>(levVar);
+                }
                 NLevels = levels.Length;
+                string levUnits = Convert.ToString(DS.Variables[levVar].Metadata.ToDictionary()["units"]) ?? "none";
+                if (pressureUnits.Contains(levUnits.ToLower()))
+                {
+                    // Pressure decreases away from the surface, so if the first value is greater than the second,
+                    // we are closer to the surface with the first value
+                    SurfaceFirst = levels[0] > levels[1];
+                }
+                else
+                {
+                    // Otherwise, no information - can only hope that lower numbers == closer to surface
+                    SurfaceFirst = levels[1] > levels[0];
+                }
             }
             else
             {
                 NLevels = 0;
+                SurfaceFirst = true; // No harm
             }
         }
+    }
+
+    private static string? testVarPresence(string[] varOpts, DataSet dataSet)
+    {
+        string? result = null;
+        foreach (string testVar in varOpts)
+        {
+            if (dataSet.Variables.Contains(testVar))
+            {
+                result = testVar;
+                break;
+            }
+        }
+        return result;
     }
 }
 
